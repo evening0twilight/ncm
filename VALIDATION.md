@@ -1,25 +1,29 @@
-# 本机验证记录（2026-09-23）
+# 验证记录（2026-09-23，macOS）
 
-## 自动测试
+环境：Python 3.14.7、`cryptography` 46.0.7、Tk 9.0、FFmpeg 8.1.2。本文件不列出用户的本机路径、曲名或音频指纹，以便公开发布。
 
-在 macOS、Python 3.14.7、`cryptography` 46.0.7、系统 FFmpeg 环境中：
+## 自动测试与 GUI 启动
 
-```text
-python -m unittest discover -s tests -v
-Ran 4 tests — OK
-```
+`python -m unittest discover -s tests -v`：10 项通过。测试时生成短的合成 FLAC/MP3 与 NCM 夹具，不使用商业音频。覆盖默认恢复字节一致、六种目标格式、24 位/192 kHz、中文路径、元数据/封面、批量结果、重名、缺少 FFmpeg 和失败清理。
 
-合成 NCM 内含测试时生成的短 FLAC/MP3 音频；恢复字节与输入原始音频逐字节相同。覆盖中文路径、跨数据块位置、错误格式提示、原始元数据/封面侧车、批量失败、重名与 FFmpeg 缺席状态。
+Tk 可创建、刷新并销毁根窗口；`ncm-restore-gui` 启动后进程保持运行，未崩溃。桌面自动化服务连续返回 `timeoutReached`，因此此轮没有完成通过鼠标操作 GUI 的可视交互验收。GUI 的格式映射和批量逻辑由自动测试覆盖；正式发布前宜人工点选并转换一份样例。
 
-## 真实本地样例
+## 真实 NCM，只读验证
 
-只读扫描 `/Users/a1-6/Music/网易云音乐` 找到两份 `.ncm`。转换产物放在仓库外 `/tmp`，未纳入 Git。转换命令执行后，成功 2、失败 0；两份输出均通过恢复时 SHA-256 回读以及 FFmpeg 完整解码。FFprobe 均识别为 FLAC、192000 Hz、双声道：
+本机四份真实 `.ncm` 的默认恢复均得到 FLAC。每份输出均通过 SHA-256 回读和 FFmpeg 整首解码，源 NCM 在验证前后的 SHA-256 一致。外层 JSON 元数据和封面均保存为侧车。音频转换产物只保存在仓库外的临时目录，未加入 Git。
 
-| 源文件 | 恢复字节数 | 时长（秒） | 输出 SHA-256 |
-|---|---:|---:|---|
-| `Matisse & Sadko,James French - Pull Me Through The Fire.ncm` | 143401581 | 216.569354 | `aa4c6b50ace0d3149e8aab676fb679fbb8a7cd0176d229e5068c4a005ac6c652` |
-| `VALORANT,Grabbitz,Oli Sykes - If The Sun Burns Out Tonight (feat. Oli Sykes & Courtney LaPlante).ncm` | 155907260 | 226.403188 | `022a67e0473aaecfc9e273d130b1b236e8a0fdd24581ee27f5633c968ef018e2` |
+对其中一份 24 位、192 kHz、双声道的真实样例按所有目标格式完整转换并验证：
 
-源 `.ncm` 在验证前后 SHA-256 相同。外层 JSON 元数据和封面均成功导出为侧车文件。完整解码与哈希校验不能证明音源本身的真实质量，也不能代替目标设备的播放测试。
+| 目标 | 实际 codec | 采样率 | 声道 | 位深 | 验证 |
+|---|---|---:|---:|---:|---|
+| 原样恢复 | FLAC | 192000 Hz | 2 | 24 | 恢复 SHA-256 与先前结果相同；整首解码 |
+| WAV | `pcm_s24le` | 192000 Hz | 2 | 24 | 整首解码；转换前后 PCM SHA-256 一致 |
+| FLAC | `flac` | 192000 Hz | 2 | 24 | 整首解码；转换前后 PCM SHA-256 一致 |
+| ALAC/M4A | `alac` | 192000 Hz | 2 | 24 | 整首解码；转换前后 PCM SHA-256 一致 |
+| MP3 | `mp3` | 48000 Hz | 2 | 有损 | 整首解码；报告明确标出降采样 |
+| AAC/M4A | `aac` | 96000 Hz | 2 | 有损 | 整首解码；报告明确标出降采样 |
+| Opus | `opus` | 48000 Hz | 2 | 有损 | 整首解码；报告明确标出降采样 |
 
-同目录另外只有 `Marcus Warner - Wings.flac.tmp` 等 3 个 0 字节临时文件，没有对应的可用 `.ncm` 样例。扫描 `/Users/a1-6/Music/Music` 仍返回 `Operation not permitted`，因此没有检验该目录内容或第三首歌曲。
+该样例的标题、艺术家、专辑在六种转码结果中均能由 FFprobe 读回；封面在 FLAC、ALAC、MP3、AAC 中作为 attached picture 被读回，WAV 与 Opus 使用封面侧车。所有格式同时保留外层 JSON 和封面侧车。源 NCM 哈希在整个验证前后不变。
+
+另一个本机音乐目录的访问仍返回 `Operation not permitted`，因此未检查该目录。以上证明本机解码与文件完整性，不证明目标设备兼容性或录音源本身音质；未做目标设备播放测试。
