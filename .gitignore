@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+recovered/
+ncm-report*.json
+*.ncm
+*.mp3
+*.flac
+*.m4a
+*.wav
+*.jpg
+*.jpeg
+*.png
