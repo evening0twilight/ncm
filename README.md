@@ -34,7 +34,7 @@ NCM Restore Local 是一个开源的网易云音乐 `.ncm` 音频恢复与格式
 
 - 原样恢复 NCM 内部的 FLAC/MP3，不重新编码。
 - 转换为 WAV、FLAC、ALAC/M4A、MP3、AAC/M4A 或 Opus。
-- 桌面 GUI：拖入或选择文件/文件夹、递归扫描、格式选择、进度与逐项结果。
+- 现代桌面 GUI：圆角卡片布局、拖入或选择文件/文件夹、格式选择、进度与逐项结果。
 - 命令行批量转换，支持中文、日文、韩文及其他 Unicode 路径。
 - 尽量写入标题、艺术家、专辑和封面，同时保留完整元数据与封面侧车。
 - SHA-256 回读校验、FFmpeg 整首解码检查，以及无损转换的 PCM 一致性检查。
@@ -148,7 +148,7 @@ Use the desktop GUI for everyday conversion or the CLI for recursive folders, au
 
 - Restore the original embedded FLAC/MP3 audio without re-encoding.
 - Convert NCM to WAV, FLAC, ALAC/M4A, MP3, AAC/M4A, or Opus.
-- Desktop GUI with drag-and-drop, file/folder selection, recursive search, progress, and per-file results.
+- Modern desktop GUI with rounded cards, drag-and-drop, format selection, progress, and per-file results.
 - Batch CLI with Unicode paths and machine-readable JSON reports.
 - Preserve or embed title, artist, album, and artwork where supported; sidecars retain the complete NCM metadata.
 - Verify output with SHA-256 rereads and full FFmpeg decoding; compare decoded PCM for lossless conversions.
@@ -257,7 +257,7 @@ NCM Restore Local は、ローカルに保存された NetEase Cloud Music の `
 
 - 内部の FLAC/MP3 を再エンコードせずに復元。
 - NCM を WAV、FLAC、ALAC/M4A、MP3、AAC/M4A、Opus に変換。
-- ドラッグ＆ドロップ、ファイル／フォルダー選択、再帰検索、進行状況、個別結果を表示する GUI。
+- 角丸カードを採用したモダン GUI。ドラッグ＆ドロップ、形式選択、進行状況、個別結果に対応。
 - Unicode パスと JSON レポートに対応した一括 CLI。
 - 対応形式ではタイトル、アーティスト、アルバム、アートワークを埋め込み、完全な情報はサイドカーファイルにも保存。
 - SHA-256 の再読み込み、FFmpeg の全曲デコード、可逆変換時の PCM 一致確認。
@@ -343,7 +343,7 @@ NCM Restore Local은 로컬에 저장된 NetEase Cloud Music `.ncm` 파일을 �
 
 - 내부 FLAC/MP3를 재인코딩 없이 복원.
 - NCM을 WAV, FLAC, ALAC/M4A, MP3, AAC/M4A, Opus로 변환.
-- 드래그 앤 드롭, 파일/폴더 선택, 하위 폴더 검색, 진행률, 파일별 결과를 제공하는 GUI.
+- 둥근 카드 레이아웃, 드래그 앤 드롭, 형식 선택, 진행률, 파일별 결과를 제공하는 현대적인 GUI.
 - Unicode 경로와 JSON 보고서를 지원하는 일괄 CLI.
 - 가능한 형식에 제목, 아티스트, 앨범, 표지를 삽입하고 전체 정보는 사이드카 파일에도 보존.
 - SHA-256 재검증, FFmpeg 전체 디코딩, 무손실 변환의 PCM 일치 검사.

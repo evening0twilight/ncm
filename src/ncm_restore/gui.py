@@ -1,4 +1,4 @@
-"""Local drag-and-drop desktop interface for NCM conversion."""
+"""Modern local drag-and-drop desktop interface for NCM conversion."""
 
 from __future__ import annotations
 
@@ -6,22 +6,26 @@ import queue
 import sys
 import threading
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Iterable
 
 from .transcode import FORMATS
 from .workflow import collect_sources, run_batch
 
-BG = "#F4F6F9"
+BG = "#F4F5F9"
 CARD = "#FFFFFF"
-TEXT = "#172033"
-MUTED = "#667085"
-ACCENT = "#2563EB"
-ACCENT_HOVER = "#1D4ED8"
-BORDER = "#D0D5DD"
-DROP_BG = "#EFF6FF"
-DROP_ACTIVE = "#DBEAFE"
-SUCCESS = "#15803D"
-DANGER = "#B42318"
+SURFACE = "#F8F9FC"
+TEXT = "#161A2B"
+MUTED = "#72778A"
+SUBTLE = "#9AA0B4"
+BORDER = "#E4E6EF"
+ACCENT = "#635BDF"
+ACCENT_HOVER = "#5148C8"
+ACCENT_SOFT = "#F0EFFF"
+DROP_ACTIVE = "#E7E5FF"
+SUCCESS = "#12A66A"
+SUCCESS_SOFT = "#EAF8F2"
+DANGER = "#E5484D"
+DANGER_SOFT = "#FFF0F0"
 
 
 def target_from_label(label: str) -> str:
@@ -56,13 +60,13 @@ def merge_input_paths(existing: Iterable[Path], candidates: Iterable[Path]) -> t
 
 def format_hint(target: str) -> str:
     hints = {
-        "original": "推荐 · 直接恢复内部 FLAC/MP3，不重新编码",
-        "wav": "无损 · 文件较大，保留采样率、声道与位深",
-        "flac": "无损 · 体积较小，适合支持 FLAC 的播放器",
-        "alac": "无损 · M4A 容器，适合 Apple 设备",
-        "mp3": "有损 · 320 kb/s，兼容性最好",
-        "aac": "有损 · 256 kb/s，M4A 容器",
-        "opus": "有损 · 192 kb/s VBR，体积较小",
+        "original": "直接恢复内部 FLAC/MP3，不重新编码",
+        "wav": "无损输出，文件较大，保留采样率、声道与位深",
+        "flac": "无损压缩，体积更小，适合多数播放器",
+        "alac": "无损 M4A，适合 Apple 设备",
+        "mp3": "320 kb/s 有损输出，设备兼容性最好",
+        "aac": "256 kb/s 有损 M4A，兼顾体积与兼容性",
+        "opus": "192 kb/s VBR 有损输出，体积较小",
     }
     return hints[target]
 
@@ -77,254 +81,450 @@ def _center_window(root: object, width: int, height: int) -> None:
 def main() -> int:
     try:
         import tkinter as tk
-        from tkinter import filedialog, messagebox, ttk
-        from tkinter import font as tkfont
+        from tkinter import filedialog, messagebox
+        import customtkinter as ctk
     except ImportError as exc:
-        raise SystemExit("桌面界面需要 Tk。macOS Homebrew Python 请安装匹配版本的 python-tk") from exc
+        raise SystemExit("桌面界面依赖 Tk 和 CustomTkinter，请重新运行：python -m pip install -e .") from exc
     try:
         from tkinterdnd2 import COPY, DND_FILES, TkinterDnD
     except ImportError as exc:
         raise SystemExit("拖拽界面依赖 tkinterdnd2，请重新运行：python -m pip install -e .") from exc
 
-    root = TkinterDnD.Tk()
+    class DragDropWindow(ctk.CTk, TkinterDnD.DnDWrapper):
+        def __init__(self) -> None:
+            super().__init__()
+            self.TkdndVersion = TkinterDnD._require(self)
+
+    ctk.set_appearance_mode("light")
+    root = DragDropWindow()
     root.title("NCM 本地音频转换")
-    root.configure(bg=BG)
-    root.minsize(820, 620)
-    _center_window(root, 980, 720)
+    root.configure(fg_color=BG)
+    root.minsize(920, 680)
+    _center_window(root, 1040, 760)
 
-    default_font = tkfont.nametofont("TkDefaultFont")
-    default_font.configure(size=11)
-    root.option_add("*Font", default_font)
-
-    style = ttk.Style(root)
-    try:
-        style.theme_use("clam")
-    except tk.TclError:
-        pass
-    style.configure("App.TFrame", background=BG)
-    style.configure("Card.TFrame", background=CARD)
-    style.configure("TLabel", background=BG, foreground=TEXT)
-    style.configure("Card.TLabel", background=CARD, foreground=TEXT)
-    style.configure("Muted.TLabel", background=BG, foreground=MUTED)
-    style.configure("CardMuted.TLabel", background=CARD, foreground=MUTED)
-    style.configure("Treeview", rowheight=28, background=CARD, fieldbackground=CARD, borderwidth=0)
-    style.configure("Treeview.Heading", padding=(8, 7), font=(default_font.actual("family"), 11, "bold"))
-    style.map("Treeview", background=[("selected", ACCENT)], foreground=[("selected", "#FFFFFF")])
-    style.configure("TButton", padding=(12, 7))
-    style.configure("Horizontal.TProgressbar", troughcolor="#E5E7EB", background=ACCENT, borderwidth=0)
+    title_font = ctk.CTkFont(size=26, weight="bold")
+    heading_font = ctk.CTkFont(size=16, weight="bold")
+    body_bold = ctk.CTkFont(size=13, weight="bold")
+    body_font = ctk.CTkFont(size=13)
+    small_font = ctk.CTkFont(size=11)
 
     messages: queue.Queue[tuple] = queue.Queue()
     inputs: list[Path] = []
     busy = False
     interactive_widgets: list[object] = []
 
-    shell = ttk.Frame(root, style="App.TFrame", padding=(24, 20, 24, 18))
-    shell.grid(row=0, column=0, sticky="nsew")
-    root.rowconfigure(0, weight=1)
-    root.columnconfigure(0, weight=1)
-    shell.columnconfigure(0, weight=1)
-    shell.rowconfigure(3, weight=2, minsize=82)
-    shell.rowconfigure(7, weight=1, minsize=74)
+    root.grid_columnconfigure(0, weight=1)
+    root.grid_rowconfigure(1, weight=1)
 
-    header = ttk.Frame(shell, style="App.TFrame")
-    header.grid(row=0, column=0, sticky="ew", pady=(0, 14))
-    header.columnconfigure(0, weight=1)
-    ttk.Label(
-        header,
-        text="NCM 本地音频转换",
-        font=(default_font.actual("family"), 24, "bold"),
-    ).grid(row=0, column=0, sticky="w")
-    ttk.Label(
-        header,
-        text="拖入文件即可开始 · 默认原样恢复 · 源文件始终保留",
-        style="Muted.TLabel",
-    ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+    header = ctk.CTkFrame(root, fg_color="transparent", corner_radius=0)
+    header.grid(row=0, column=0, sticky="ew", padx=28, pady=(22, 16))
+    header.grid_columnconfigure(1, weight=1)
 
-    drop_card = tk.Frame(
-        shell,
-        bg=DROP_BG,
-        highlightbackground="#93C5FD",
-        highlightcolor=ACCENT,
-        highlightthickness=2,
-        cursor="hand2",
-        height=102,
+    logo = ctk.CTkFrame(header, width=48, height=48, corner_radius=15, fg_color=ACCENT)
+    logo.grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 14))
+    logo.grid_propagate(False)
+    ctk.CTkLabel(logo, text="N", text_color="#FFFFFF", font=ctk.CTkFont(size=21, weight="bold")).place(
+        relx=0.5, rely=0.5, anchor="center"
     )
-    drop_card.grid(row=1, column=0, sticky="ew")
+
+    ctk.CTkLabel(header, text="NCM 音频转换", text_color=TEXT, font=title_font, anchor="w").grid(
+        row=0, column=1, sticky="sw"
+    )
+    ctk.CTkLabel(
+        header,
+        text="拖入文件，选择格式，一次完成",
+        text_color=MUTED,
+        font=body_font,
+        anchor="w",
+    ).grid(row=1, column=1, sticky="nw", pady=(2, 0))
+
+    privacy_badge = ctk.CTkFrame(header, fg_color=SUCCESS_SOFT, corner_radius=18)
+    privacy_badge.grid(row=0, column=2, rowspan=2, sticky="e")
+    ctk.CTkLabel(
+        privacy_badge,
+        text="●  仅在本机处理",
+        text_color=SUCCESS,
+        font=small_font,
+    ).pack(padx=14, pady=8)
+
+    workspace = ctk.CTkFrame(root, fg_color="transparent", corner_radius=0)
+    workspace.grid(row=1, column=0, sticky="nsew", padx=28)
+    workspace.grid_columnconfigure(0, weight=3, uniform="workspace")
+    workspace.grid_columnconfigure(1, weight=2, uniform="workspace")
+    workspace.grid_rowconfigure(0, weight=1)
+
+    queue_card = ctk.CTkFrame(workspace, fg_color=CARD, corner_radius=20, border_width=1, border_color=BORDER)
+    queue_card.grid(row=0, column=0, sticky="nsew", padx=(0, 9))
+    queue_card.grid_columnconfigure(0, weight=1)
+    queue_card.grid_rowconfigure(3, weight=1)
+
+    queue_header = ctk.CTkFrame(queue_card, fg_color="transparent")
+    queue_header.grid(row=0, column=0, sticky="ew", padx=20, pady=(18, 12))
+    queue_header.grid_columnconfigure(1, weight=1)
+    ctk.CTkLabel(queue_header, text="待转换文件", text_color=TEXT, font=heading_font).grid(row=0, column=0, sticky="w")
+    queue_count = ctk.CTkLabel(
+        queue_header,
+        text="0 项",
+        width=48,
+        height=26,
+        fg_color=ACCENT_SOFT,
+        text_color=ACCENT,
+        corner_radius=13,
+        font=small_font,
+    )
+    queue_count.grid(row=0, column=1, sticky="w", padx=(10, 0))
+    clear_button = ctk.CTkButton(
+        queue_header,
+        text="清空",
+        width=58,
+        height=30,
+        corner_radius=10,
+        fg_color="transparent",
+        hover_color=SURFACE,
+        text_color=MUTED,
+        font=small_font,
+    )
+    clear_button.grid(row=0, column=2, sticky="e")
+
+    drop_card = ctk.CTkFrame(
+        queue_card,
+        height=124,
+        fg_color=ACCENT_SOFT,
+        corner_radius=16,
+        border_width=2,
+        border_color="#C8C5FF",
+        cursor="hand2",
+    )
+    drop_card.grid(row=1, column=0, sticky="ew", padx=20)
     drop_card.grid_propagate(False)
-    drop_card.columnconfigure(0, weight=1)
-    drop_card.rowconfigure(0, weight=1)
-    drop_content = tk.Frame(drop_card, bg=DROP_BG, cursor="hand2")
+    drop_card.grid_columnconfigure(0, weight=1)
+    drop_card.grid_rowconfigure(0, weight=1)
+    drop_content = ctk.CTkFrame(drop_card, fg_color="transparent", cursor="hand2")
     drop_content.grid(row=0, column=0)
-    drop_title = tk.Label(
+    drop_icon = ctk.CTkLabel(
         drop_content,
-        text="⇩  把 NCM 文件或文件夹拖到这里",
-        bg=DROP_BG,
-        fg=ACCENT,
-        font=(default_font.actual("family"), 16, "bold"),
+        text="＋",
+        width=34,
+        height=34,
+        corner_radius=17,
+        fg_color=ACCENT,
+        text_color="#FFFFFF",
+        font=ctk.CTkFont(size=20, weight="bold"),
+        cursor="hand2",
+    )
+    drop_icon.pack(pady=(0, 8))
+    drop_title = ctk.CTkLabel(
+        drop_content,
+        text="拖放 NCM 文件或文件夹",
+        text_color=ACCENT,
+        font=body_bold,
         cursor="hand2",
     )
     drop_title.pack()
-    drop_subtitle = tk.Label(
+    drop_subtitle = ctk.CTkLabel(
         drop_content,
-        text="也可以点击此区域选择多个 .ncm 文件",
-        bg=DROP_BG,
-        fg=MUTED,
+        text="也可以点击这里选择文件",
+        text_color=MUTED,
+        font=small_font,
         cursor="hand2",
     )
-    drop_subtitle.pack(pady=(6, 0))
+    drop_subtitle.pack(pady=(3, 0))
 
-    queue_bar = ttk.Frame(shell, style="App.TFrame")
-    queue_bar.grid(row=2, column=0, sticky="ew", pady=(12, 7))
-    queue_bar.columnconfigure(0, weight=1)
-    queue_label = ttk.Label(queue_bar, text="待转换  0 项", font=(default_font.actual("family"), 12, "bold"))
-    queue_label.grid(row=0, column=0, sticky="w")
-
-    queue_actions = ttk.Frame(queue_bar, style="App.TFrame")
-    queue_actions.grid(row=0, column=1, sticky="e")
-
-    input_frame = ttk.Frame(shell, style="Card.TFrame")
-    input_frame.grid(row=3, column=0, sticky="nsew")
-    input_frame.rowconfigure(0, weight=1)
-    input_frame.columnconfigure(0, weight=1)
-    input_tree = ttk.Treeview(
-        input_frame,
-        columns=("name", "kind", "path"),
-        show="headings",
-        height=5,
-        selectmode="extended",
+    queue_actions = ctk.CTkFrame(queue_card, fg_color="transparent")
+    queue_actions.grid(row=2, column=0, sticky="ew", padx=20, pady=(12, 10))
+    queue_actions.grid_columnconfigure((0, 1), weight=1)
+    add_file_button = ctk.CTkButton(
+        queue_actions,
+        text="＋  添加文件",
+        height=34,
+        corner_radius=11,
+        fg_color=SURFACE,
+        hover_color="#EEF0F6",
+        text_color=TEXT,
+        border_width=1,
+        border_color=BORDER,
+        font=small_font,
     )
-    input_tree.heading("name", text="名称")
-    input_tree.heading("kind", text="类型")
-    input_tree.heading("path", text="位置")
-    input_tree.column("name", width=260, minwidth=150)
-    input_tree.column("kind", width=90, minwidth=80, stretch=False, anchor="center")
-    input_tree.column("path", width=520, minwidth=240)
-    input_scroll = ttk.Scrollbar(input_frame, orient="vertical", command=input_tree.yview)
-    input_tree.configure(yscrollcommand=input_scroll.set)
-    input_tree.grid(row=0, column=0, sticky="nsew")
-    input_scroll.grid(row=0, column=1, sticky="ns")
+    add_file_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+    add_folder_button = ctk.CTkButton(
+        queue_actions,
+        text="＋  添加文件夹",
+        height=34,
+        corner_radius=11,
+        fg_color=SURFACE,
+        hover_color="#EEF0F6",
+        text_color=TEXT,
+        border_width=1,
+        border_color=BORDER,
+        font=small_font,
+    )
+    add_folder_button.grid(row=0, column=1, sticky="ew", padx=(5, 0))
 
-    options = ttk.Frame(shell, style="Card.TFrame", padding=(14, 12))
-    options.grid(row=4, column=0, sticky="ew", pady=(14, 0))
-    options.columnconfigure(1, weight=3)
-    options.columnconfigure(2, weight=2)
+    input_list = ctk.CTkScrollableFrame(
+        queue_card,
+        fg_color=SURFACE,
+        corner_radius=14,
+        scrollbar_button_color="#D8DAE5",
+        scrollbar_button_hover_color="#BFC3D2",
+    )
+    input_list.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 20))
+    input_list.grid_columnconfigure(0, weight=1)
 
-    ttk.Label(options, text="输出目录", style="Card.TLabel", font=(default_font.actual("family"), 11, "bold")).grid(row=0, column=0, sticky="w")
-    output_var = tk.StringVar()
-    output_entry = ttk.Entry(options, textvariable=output_var)
-    output_entry.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(12, 10))
-    choose_output_button = ttk.Button(options, text="选择目录…")
-    choose_output_button.grid(row=0, column=3, sticky="ew")
-    ttk.Label(options, text="留空时输出到源文件旁的 recovered 文件夹", style="CardMuted.TLabel").grid(row=1, column=1, columnspan=3, sticky="w", pady=(4, 8))
+    settings_card = ctk.CTkFrame(workspace, fg_color=CARD, corner_radius=20, border_width=1, border_color=BORDER)
+    settings_card.grid(row=0, column=1, sticky="nsew", padx=(9, 0))
+    settings_card.grid_columnconfigure(0, weight=1)
+    settings_card.grid_rowconfigure(8, weight=1)
 
-    ttk.Label(options, text="目标格式", style="Card.TLabel", font=(default_font.actual("family"), 11, "bold")).grid(row=3, column=0, sticky="w")
+    ctk.CTkLabel(settings_card, text="转换设置", text_color=TEXT, font=heading_font, anchor="w").grid(
+        row=0, column=0, sticky="ew", padx=20, pady=(18, 16)
+    )
+    ctk.CTkLabel(settings_card, text="目标格式", text_color=MUTED, font=small_font, anchor="w").grid(
+        row=1, column=0, sticky="ew", padx=20
+    )
     format_var = tk.StringVar(value=FORMATS["original"]["label"])
-    format_box = ttk.Combobox(
-        options,
-        textvariable=format_var,
+    format_menu = ctk.CTkOptionMenu(
+        settings_card,
+        variable=format_var,
         values=[item["label"] for item in FORMATS.values()],
-        state="readonly",
-        width=34,
+        height=40,
+        corner_radius=12,
+        fg_color=SURFACE,
+        button_color="#E7E8F0",
+        button_hover_color="#DADCE8",
+        text_color=TEXT,
+        dropdown_fg_color=CARD,
+        dropdown_hover_color=ACCENT_SOFT,
+        dropdown_text_color=TEXT,
+        font=body_font,
     )
-    format_box.grid(row=3, column=1, sticky="ew", padx=(12, 14))
+    format_menu.grid(row=2, column=0, sticky="ew", padx=20, pady=(6, 10))
+
     hint_var = tk.StringVar(value=format_hint("original"))
-    ttk.Label(options, textvariable=hint_var, style="CardMuted.TLabel", wraplength=360).grid(row=3, column=2, sticky="w")
-    recursive = tk.BooleanVar(value=True)
-    recursive_button = ttk.Checkbutton(options, text="文件夹包含子目录", variable=recursive)
-    recursive_button.grid(row=3, column=3, sticky="e", padx=(10, 0))
+    hint_card = ctk.CTkFrame(settings_card, fg_color=ACCENT_SOFT, corner_radius=12)
+    hint_card.grid(row=3, column=0, sticky="ew", padx=20)
+    hint_card.grid_columnconfigure(1, weight=1)
+    ctk.CTkLabel(hint_card, text="✓", text_color=ACCENT, font=body_bold).grid(row=0, column=0, padx=(12, 8), pady=10)
+    ctk.CTkLabel(
+        hint_card,
+        textvariable=hint_var,
+        text_color=ACCENT,
+        font=small_font,
+        anchor="w",
+        justify="left",
+        wraplength=260,
+    ).grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=10)
 
-    progress_area = ttk.Frame(shell, style="App.TFrame")
-    progress_area.grid(row=5, column=0, sticky="ew", pady=(14, 8))
-    progress_area.columnconfigure(0, weight=1)
-    progress = ttk.Progressbar(progress_area, mode="determinate")
-    progress.grid(row=0, column=0, sticky="ew")
-    status_var = tk.StringVar(value="添加 NCM 文件后即可转换")
-    status_label = ttk.Label(progress_area, textvariable=status_var, style="Muted.TLabel")
-    status_label.grid(row=1, column=0, sticky="w", pady=(5, 0))
-
-    result_heading = ttk.Label(shell, text="转换结果", font=(default_font.actual("family"), 12, "bold"))
-    result_heading.grid(row=6, column=0, sticky="w", pady=(2, 7))
-    result_frame = ttk.Frame(shell, style="Card.TFrame")
-    result_frame.grid(row=7, column=0, sticky="nsew")
-    result_frame.rowconfigure(0, weight=1)
-    result_frame.columnconfigure(0, weight=1)
-    result_tree = ttk.Treeview(
-        result_frame,
-        columns=("status", "source", "detail"),
-        show="headings",
-        height=4,
+    ctk.CTkLabel(settings_card, text="输出目录", text_color=MUTED, font=small_font, anchor="w").grid(
+        row=4, column=0, sticky="ew", padx=20, pady=(16, 0)
     )
-    for column, title, width in (
-        ("status", "状态", 74),
-        ("source", "源文件", 280),
-        ("detail", "输出位置或失败原因", 540),
-    ):
-        result_tree.heading(column, text=title)
-        result_tree.column(column, width=width, stretch=column != "status")
-    result_scroll = ttk.Scrollbar(result_frame, orient="vertical", command=result_tree.yview)
-    result_tree.configure(yscrollcommand=result_scroll.set)
-    result_tree.grid(row=0, column=0, sticky="nsew")
-    result_scroll.grid(row=0, column=1, sticky="ns")
+    output_row = ctk.CTkFrame(settings_card, fg_color="transparent")
+    output_row.grid(row=5, column=0, sticky="ew", padx=20, pady=(6, 4))
+    output_row.grid_columnconfigure(0, weight=1)
+    output_var = tk.StringVar()
+    output_entry = ctk.CTkEntry(
+        output_row,
+        textvariable=output_var,
+        height=40,
+        corner_radius=12,
+        fg_color=SURFACE,
+        border_color=BORDER,
+        text_color=TEXT,
+        placeholder_text="自动保存到 recovered 文件夹",
+        placeholder_text_color=SUBTLE,
+        font=small_font,
+    )
+    output_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+    choose_output_button = ctk.CTkButton(
+        output_row,
+        text="选择",
+        width=64,
+        height=40,
+        corner_radius=12,
+        fg_color=SURFACE,
+        hover_color="#EEF0F6",
+        text_color=TEXT,
+        border_width=1,
+        border_color=BORDER,
+        font=small_font,
+    )
+    choose_output_button.grid(row=0, column=1)
 
-    action_bar = ttk.Frame(shell, style="App.TFrame")
-    action_bar.grid(row=8, column=0, sticky="ew", pady=(14, 0))
-    action_bar.columnconfigure(0, weight=1)
-    safety_label = ttk.Label(action_bar, text="✓ 不覆盖已有文件  ·  ✓ 不删除源文件", foreground=SUCCESS)
-    safety_label.grid(row=0, column=0, sticky="w")
-    start_button = tk.Button(
-        action_bar,
-        text="开始转换",
-        command=lambda: start(),
-        bg=ACCENT,
-        activebackground=ACCENT_HOVER,
-        fg="#FFFFFF",
-        activeforeground="#FFFFFF",
-        disabledforeground="#D1D5DB",
-        font=(default_font.actual("family"), 14, "bold"),
-        relief="flat",
-        borderwidth=0,
-        padx=28,
-        pady=11,
-        cursor="hand2",
+    recursive = tk.BooleanVar(value=True)
+    recursive_switch = ctk.CTkSwitch(
+        settings_card,
+        text="搜索文件夹中的子目录",
+        variable=recursive,
+        progress_color=ACCENT,
+        button_color="#FFFFFF",
+        button_hover_color="#FFFFFF",
+        text_color=TEXT,
+        font=small_font,
+    )
+    recursive_switch.grid(row=6, column=0, sticky="w", padx=20, pady=(12, 0))
+
+    safety_card = ctk.CTkFrame(settings_card, fg_color=SUCCESS_SOFT, corner_radius=12)
+    safety_card.grid(row=7, column=0, sticky="ew", padx=20, pady=(16, 0))
+    ctk.CTkLabel(
+        safety_card,
+        text="✓ 保留源文件    ✓ 不覆盖已有文件",
+        text_color=SUCCESS,
+        font=small_font,
+    ).pack(padx=12, pady=9)
+
+    start_button = ctk.CTkButton(
+        settings_card,
+        text="添加文件后即可开始",
+        height=48,
+        corner_radius=14,
+        fg_color="#C9C7E9",
+        hover_color="#C9C7E9",
+        text_color="#FFFFFF",
+        font=body_bold,
         state="disabled",
     )
-    start_button.grid(row=0, column=1, sticky="e")
+    start_button.grid(row=9, column=0, sticky="ew", padx=20, pady=(18, 20))
+
+    result_card = ctk.CTkFrame(
+        root,
+        height=168,
+        fg_color=CARD,
+        corner_radius=20,
+        border_width=1,
+        border_color=BORDER,
+    )
+    result_card.grid(row=2, column=0, sticky="ew", padx=28, pady=(18, 24))
+    result_card.grid_propagate(False)
+    result_card.grid_columnconfigure(0, weight=1)
+    result_card.grid_rowconfigure(2, weight=1)
+
+    result_header = ctk.CTkFrame(result_card, fg_color="transparent")
+    result_header.grid(row=0, column=0, sticky="ew", padx=20, pady=(14, 8))
+    result_header.grid_columnconfigure(1, weight=1)
+    ctk.CTkLabel(result_header, text="转换进度", text_color=TEXT, font=body_bold).grid(row=0, column=0, sticky="w")
+    status_var = tk.StringVar(value="等待添加文件")
+    ctk.CTkLabel(result_header, textvariable=status_var, text_color=MUTED, font=small_font).grid(row=0, column=1, sticky="e")
+
+    progress = ctk.CTkProgressBar(
+        result_card,
+        height=8,
+        corner_radius=4,
+        fg_color="#EBECF2",
+        progress_color=ACCENT,
+    )
+    progress.grid(row=1, column=0, sticky="ew", padx=20)
+    progress.set(0)
+
+    result_list = ctk.CTkScrollableFrame(
+        result_card,
+        height=60,
+        fg_color=SURFACE,
+        corner_radius=12,
+        scrollbar_button_color="#D8DAE5",
+        scrollbar_button_hover_color="#BFC3D2",
+    )
+    result_list.grid(row=2, column=0, sticky="nsew", padx=20, pady=(10, 16))
+    result_list.grid_columnconfigure(0, weight=1)
+
+    def clear_frame(frame: object) -> None:
+        for child in frame.winfo_children():
+            child.destroy()
+
+    def empty_row(parent: object, text: str) -> None:
+        ctk.CTkLabel(parent, text=text, text_color=SUBTLE, font=small_font).grid(
+            row=0, column=0, sticky="nsew", pady=16
+        )
 
     def set_drop_style(active: bool) -> None:
-        color = DROP_ACTIVE if active else DROP_BG
-        border = ACCENT if active else "#93C5FD"
-        drop_card.configure(bg=color, highlightbackground=border)
-        drop_content.configure(bg=color)
-        drop_title.configure(bg=color)
-        drop_subtitle.configure(bg=color)
+        drop_card.configure(
+            fg_color=DROP_ACTIVE if active else ACCENT_SOFT,
+            border_color=ACCENT if active else "#C8C5FF",
+        )
+        drop_title.configure(text="松开即可加入转换列表" if active else "拖放 NCM 文件或文件夹")
 
     def update_start_button() -> None:
         if busy:
-            start_button.configure(text="转换中…", state="disabled", bg="#94A3B8")
+            start_button.configure(
+                text="正在转换…",
+                state="disabled",
+                fg_color="#AAA7D7",
+                hover_color="#AAA7D7",
+            )
         elif inputs:
-            start_button.configure(text=f"开始转换（{len(inputs)}）", state="normal", bg=ACCENT)
+            start_button.configure(
+                text=f"开始转换  ·  {len(inputs)} 项",
+                state="normal",
+                fg_color=ACCENT,
+                hover_color=ACCENT_HOVER,
+            )
         else:
-            start_button.configure(text="开始转换", state="disabled", bg="#94A3B8")
+            start_button.configure(
+                text="添加文件后即可开始",
+                state="disabled",
+                fg_color="#C9C7E9",
+                hover_color="#C9C7E9",
+            )
+
+    def remove_path(path: Path) -> None:
+        nonlocal inputs
+        if busy:
+            return
+        inputs = [item for item in inputs if item != path]
+        redraw_inputs()
+        status_var.set(f"剩余 {len(inputs)} 项" if inputs else "等待添加文件")
 
     def redraw_inputs() -> None:
-        input_tree.delete(*input_tree.get_children())
+        clear_frame(input_list)
+        queue_count.configure(text=f"{len(inputs)} 项")
+        if not inputs:
+            empty_row(input_list, "还没有文件，拖进来试试")
         for index, path in enumerate(inputs):
-            kind = "文件夹" if path.is_dir() else "NCM 文件"
-            input_tree.insert("", "end", iid=str(index), values=(path.name, kind, str(path.parent)))
-        queue_label.configure(text=f"待转换  {len(inputs)} 项")
+            row = ctk.CTkFrame(input_list, fg_color=CARD, corner_radius=11, border_width=1, border_color=BORDER)
+            row.grid(row=index, column=0, sticky="ew", pady=(0, 7))
+            row.grid_columnconfigure(1, weight=1)
+            badge = ctk.CTkLabel(
+                row,
+                text="夹" if path.is_dir() else "音",
+                width=32,
+                height=32,
+                corner_radius=10,
+                fg_color=ACCENT_SOFT,
+                text_color=ACCENT,
+                font=body_bold,
+            )
+            badge.grid(row=0, column=0, rowspan=2, padx=(10, 9), pady=9)
+            ctk.CTkLabel(row, text=path.name, text_color=TEXT, font=small_font, anchor="w").grid(
+                row=0, column=1, sticky="sew", pady=(8, 0)
+            )
+            location = "文件夹" if path.is_dir() else str(path.parent)
+            ctk.CTkLabel(row, text=location, text_color=SUBTLE, font=ctk.CTkFont(size=10), anchor="w").grid(
+                row=1, column=1, sticky="new", pady=(0, 8)
+            )
+            ctk.CTkButton(
+                row,
+                text="×",
+                width=28,
+                height=28,
+                corner_radius=9,
+                fg_color="transparent",
+                hover_color=DANGER_SOFT,
+                text_color=MUTED,
+                font=ctk.CTkFont(size=17),
+                command=lambda item=path: remove_path(item),
+            ).grid(row=0, column=2, rowspan=2, padx=9)
+            register_drop_tree(row)
         update_start_button()
 
     def add_paths(paths: Iterable[Path]) -> None:
         nonlocal inputs
         if busy:
-            status_var.set("当前批次正在转换，请完成后再添加文件")
+            status_var.set("当前批次正在转换")
             return
         previous = len(inputs)
         inputs, rejected = merge_input_paths(inputs, paths)
         added = len(inputs) - previous
         redraw_inputs()
         if added:
-            status_var.set(f"已加入 {added} 项，共 {len(inputs)} 项 · 现在可以点击右下角开始转换")
+            status_var.set(f"已加入 {added} 项，可以开始转换")
         elif rejected:
             status_var.set(rejected[0])
         else:
@@ -344,16 +544,10 @@ def main() -> int:
         if selected:
             add_paths([Path(selected)])
 
-    def remove_selected() -> None:
-        nonlocal inputs
-        indexes = sorted((int(item) for item in input_tree.selection()), reverse=True)
-        for index in indexes:
-            inputs.pop(index)
-        redraw_inputs()
-        status_var.set(f"剩余 {len(inputs)} 项" if inputs else "添加 NCM 文件后即可转换")
-
     def clear_inputs() -> None:
         nonlocal inputs
+        if busy:
+            return
         inputs = []
         redraw_inputs()
         status_var.set("列表已清空")
@@ -363,44 +557,20 @@ def main() -> int:
         if selected:
             output_var.set(selected)
 
-    add_file_button = ttk.Button(queue_actions, text="添加文件…", command=add_files)
-    add_file_button.pack(side="left", padx=(0, 6))
-    add_folder_button = ttk.Button(queue_actions, text="添加文件夹…", command=add_folder)
-    add_folder_button.pack(side="left", padx=(0, 6))
-    remove_button = ttk.Button(queue_actions, text="移除选中", command=remove_selected)
-    remove_button.pack(side="left", padx=(0, 6))
-    clear_button = ttk.Button(queue_actions, text="清空", command=clear_inputs)
-    clear_button.pack(side="left")
-    choose_output_button.configure(command=choose_output)
-    interactive_widgets.extend([
-        add_file_button,
-        add_folder_button,
-        remove_button,
-        clear_button,
-        choose_output_button,
-        output_entry,
-        format_box,
-        recursive_button,
-    ])
-
-    def on_format_changed(*_: object) -> None:
-        hint_var.set(format_hint(target_from_label(format_var.get())))
-
-    format_var.trace_add("write", on_format_changed)
+    def on_format_changed(label: str) -> None:
+        hint_var.set(format_hint(target_from_label(label)))
 
     def on_drop_enter(_: object) -> str:
         if not busy:
             set_drop_style(True)
-            drop_title.configure(text="松开即可加入转换列表")
         return COPY
 
     def on_drop_leave(_: object) -> str:
         set_drop_style(False)
-        drop_title.configure(text="⇩  把 NCM 文件或文件夹拖到这里")
         return COPY
 
     def on_drop(event: object) -> str:
-        on_drop_leave(event)
+        set_drop_style(False)
         try:
             raw_paths = root.tk.splitlist(event.data)
             add_paths(Path(item) for item in raw_paths)
@@ -408,22 +578,58 @@ def main() -> int:
             messagebox.showerror("无法读取拖入内容", str(exc))
         return COPY
 
-    for widget in (drop_card, drop_content, drop_title, drop_subtitle, input_tree):
+    def register_drop_tree(widget: object) -> None:
         widget.drop_target_register(DND_FILES)
         widget.dnd_bind("<<DropEnter>>", on_drop_enter)
         widget.dnd_bind("<<DropLeave>>", on_drop_leave)
         widget.dnd_bind("<<Drop>>", on_drop)
-    for widget in (drop_card, drop_content, drop_title, drop_subtitle):
-        widget.bind("<Button-1>", lambda _: add_files())
+        for child in widget.winfo_children():
+            register_drop_tree(child)
+
+    def bind_click_tree(widget: object) -> None:
+        widget.bind("<Button-1>", lambda _: add_files(), add="+")
+        for child in widget.winfo_children():
+            bind_click_tree(child)
 
     def set_controls_enabled(enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
         for widget in interactive_widgets:
-            if widget is format_box:
-                widget.configure(state="readonly" if enabled else "disabled")
-            else:
-                widget.configure(state=state)
+            widget.configure(state=state)
         update_start_button()
+
+    def add_result(item: dict, ok: bool) -> None:
+        row_index = len(result_list.winfo_children())
+        row = ctk.CTkFrame(result_list, fg_color=CARD, corner_radius=10, border_width=1, border_color=BORDER)
+        row.grid(row=row_index, column=0, sticky="ew", pady=(0, 6))
+        row.grid_columnconfigure(1, weight=1)
+        status = ctk.CTkLabel(
+            row,
+            text="成功" if ok else "失败",
+            width=48,
+            height=24,
+            corner_radius=12,
+            fg_color=SUCCESS_SOFT if ok else DANGER_SOFT,
+            text_color=SUCCESS if ok else DANGER,
+            font=small_font,
+        )
+        status.grid(row=0, column=0, rowspan=2, padx=10, pady=9)
+        ctk.CTkLabel(
+            row,
+            text=Path(item["source"]).name,
+            text_color=TEXT,
+            font=small_font,
+            anchor="w",
+        ).grid(row=0, column=1, sticky="sew", pady=(7, 0))
+        detail = item.get("output", "") if ok else item.get("error", "")
+        if ok and item.get("notes"):
+            detail += " · " + "；".join(item["notes"])
+        ctk.CTkLabel(
+            row,
+            text=detail,
+            text_color=SUBTLE,
+            font=ctk.CTkFont(size=10),
+            anchor="w",
+        ).grid(row=1, column=1, sticky="new", padx=(0, 10), pady=(0, 7))
 
     def worker(sources: list[Path], output: Path | None, target: str, initial_failures: list[dict]) -> None:
         try:
@@ -450,16 +656,16 @@ def main() -> int:
             detail = failures[0]["error"] if failures else "未找到 NCM 文件"
             messagebox.showinfo("无法开始转换", detail)
             return
-        result_tree.delete(*result_tree.get_children())
-        progress.configure(maximum=max(len(sources), 1), value=0)
-        status_var.set(f"准备处理 {len(sources)} 个文件…")
+        clear_frame(result_list)
+        progress.set(0)
+        status_var.set(f"准备转换 {len(sources)} 个文件")
         busy = True
         set_controls_enabled(False)
         threading.Thread(
             target=worker,
             args=(
                 sources,
-                Path(output_var.get()) if output_var.get().strip() else None,
+                Path(output_var.get()).expanduser() if output_var.get().strip() else None,
                 target_from_label(format_var.get()),
                 failures,
             ),
@@ -476,12 +682,8 @@ def main() -> int:
                     status_var.set(f"正在转换 {index}/{total} · {Path(source).name}")
                 elif event[0] == "result":
                     _, index, total, item, ok = event
-                    detail = item.get("output", "") if ok else item.get("error", "")
-                    if ok and item.get("notes"):
-                        detail += " · " + "；".join(item["notes"])
-                    result_tree.insert("", "end", values=("成功" if ok else "失败", Path(item["source"]).name, detail))
-                    progress.configure(value=index)
-                    result_tree.yview_moveto(1)
+                    add_result(item, ok)
+                    progress.set(index / max(total, 1))
                     status_var.set(f"已处理 {index}/{total} 个文件")
                 elif event[0] == "done":
                     busy = False
@@ -502,6 +704,25 @@ def main() -> int:
         else:
             root.destroy()
 
+    clear_button.configure(command=clear_inputs)
+    add_file_button.configure(command=add_files)
+    add_folder_button.configure(command=add_folder)
+    choose_output_button.configure(command=choose_output)
+    format_menu.configure(command=on_format_changed)
+    start_button.configure(command=start)
+    interactive_widgets.extend(
+        [clear_button, add_file_button, add_folder_button, choose_output_button, output_entry, format_menu, recursive_switch]
+    )
+
+    initial_paths = [Path(argument) for argument in sys.argv[1:] if argument != "--"]
+    if initial_paths:
+        add_paths(initial_paths)
+    else:
+        redraw_inputs()
+    empty_row(result_list, "完成的转换会显示在这里")
+    root.update_idletasks()
+    register_drop_tree(root)
+    bind_click_tree(drop_card)
     root.bind("<Return>", lambda _: start())
     if sys.platform == "darwin":
         root.bind("<Command-o>", lambda _: add_files())
@@ -509,7 +730,6 @@ def main() -> int:
         root.bind("<Control-o>", lambda _: add_files())
     root.protocol("WM_DELETE_WINDOW", close)
     root.after(100, poll)
-    redraw_inputs()
     root.mainloop()
     return 0
 
