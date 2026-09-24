@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from test_restore import _pack_ncm
 from ncm_restore.core import NcmError
-from ncm_restore.gui import target_from_label
+from ncm_restore.gui import format_hint, merge_input_paths, target_from_label
 from ncm_restore.transcode import FORMATS, _probe, convert
 from ncm_restore.workflow import collect_sources, run_batch
 
@@ -127,6 +127,26 @@ class TranscodeTests(unittest.TestCase):
         self.assertEqual((len(successes), len(failures), len(events)), (1, 0, 1))
         self.assertEqual(starts, [(1, 1, duplicate)])
         self.assertTrue(events[0][-1])
+
+    def test_gui_drop_validation_and_format_guidance(self):
+        folder = self.root / "拖拽文件夹"
+        folder.mkdir()
+        ncm = self.root / "有 空格.ncm"
+        ncm.write_bytes(self.source.read_bytes())
+        text = self.root / "不是音频.txt"
+        text.write_text("not ncm")
+
+        merged, rejected = merge_input_paths(
+            [ncm],
+            [ncm, folder, text, self.root / "missing.ncm"],
+        )
+
+        self.assertEqual(merged, [ncm, folder])
+        self.assertEqual(len(rejected), 2)
+        self.assertTrue(any("不是 NCM" in item for item in rejected))
+        self.assertTrue(any("路径不存在" in item for item in rejected))
+        self.assertIn("不重新编码", format_hint("original"))
+        self.assertIn("Apple", format_hint("alac"))
 
 
 if __name__ == "__main__":

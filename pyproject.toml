@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ncm-restore-local"
-version = "0.2.0"
+version = "0.3.0"
 description = "Restore or locally convert audio from NCM files"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["cryptography>=42,<47"]
-license = {text = "MIT"}
+dependencies = [
+    "cryptography>=42,<47",
+    "tkinterdnd2>=0.6,<0.7",
+]
+license = "MIT"
 
 [project.scripts]
 ncm-restore = "ncm_restore.cli:main"
