@@ -18,6 +18,8 @@ TEXT = "#161A2B"
 MUTED = "#72778A"
 SUBTLE = "#9AA0B4"
 BORDER = "#E4E6EF"
+CONTROL_BORDER = "#C7CAD7"
+SWITCH_OFF = "#D5D8E2"
 ACCENT = "#635BDF"
 ACCENT_HOVER = "#5148C8"
 ACCENT_SOFT = "#F0EFFF"
@@ -99,14 +101,14 @@ def main() -> int:
     root = DragDropWindow()
     root.title("NCM 本地音频转换")
     root.configure(fg_color=BG)
-    root.minsize(920, 680)
-    _center_window(root, 1040, 760)
+    root.minsize(1040, 760)
+    _center_window(root, 1180, 900)
 
     title_font = ctk.CTkFont(size=26, weight="bold")
     heading_font = ctk.CTkFont(size=16, weight="bold")
     body_bold = ctk.CTkFont(size=13, weight="bold")
     body_font = ctk.CTkFont(size=13)
-    small_font = ctk.CTkFont(size=11)
+    small_font = ctk.CTkFont(size=12)
 
     messages: queue.Queue[tuple] = queue.Queue()
     inputs: list[Path] = []
@@ -281,41 +283,50 @@ def main() -> int:
     ctk.CTkLabel(settings_card, text="目标格式", text_color=MUTED, font=small_font, anchor="w").grid(
         row=1, column=0, sticky="ew", padx=20
     )
-    format_var = tk.StringVar(value=FORMATS["original"]["label"])
-    format_selector = ctk.CTkFrame(
+    target_var = tk.StringVar(value="original")
+    format_grid = ctk.CTkFrame(
         settings_card,
-        height=38,
+        height=88,
         corner_radius=12,
         fg_color=SURFACE,
         border_width=1,
         border_color=BORDER,
     )
-    format_selector.grid(row=2, column=0, sticky="ew", padx=20, pady=(5, 8))
-    format_selector.grid_columnconfigure(0, weight=1)
-    format_display = ctk.CTkButton(
-        format_selector,
-        textvariable=format_var,
-        height=36,
-        corner_radius=11,
-        fg_color="transparent",
-        hover_color="#EEF0F6",
-        text_color=TEXT,
-        font=body_font,
-        anchor="w",
-    )
-    format_display.grid(row=0, column=0, sticky="ew")
-    format_arrow = ctk.CTkButton(
-        format_selector,
-        text="⌄",
-        width=42,
-        height=36,
-        corner_radius=11,
-        fg_color="transparent",
-        hover_color="#E7E8F0",
-        text_color=TEXT,
-        font=ctk.CTkFont(size=18, weight="bold"),
-    )
-    format_arrow.grid(row=0, column=1, sticky="e")
+    format_grid.grid(row=2, column=0, sticky="ew", padx=20, pady=(6, 8))
+    format_grid.grid_propagate(False)
+    format_grid.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="format")
+    compact_format_labels = {
+        "original": "原样恢复",
+        "wav": "WAV",
+        "flac": "FLAC",
+        "alac": "ALAC / M4A",
+        "mp3": "MP3 320k",
+        "aac": "AAC / M4A",
+        "opus": "Opus / OGG",
+    }
+    format_choices: dict[str, object] = {}
+    for option_index, (option_key, label) in enumerate(compact_format_labels.items()):
+        option_button = ctk.CTkButton(
+            format_grid,
+            text=label,
+            height=34,
+            corner_radius=9,
+            fg_color=ACCENT if option_key == "original" else "transparent",
+            hover_color=ACCENT_HOVER if option_key == "original" else ACCENT_SOFT,
+            text_color="#FFFFFF" if option_key == "original" else TEXT,
+            border_width=1,
+            border_color=ACCENT if option_key == "original" else SURFACE,
+            font=small_font,
+            command=lambda key=option_key: choose_format(key),
+        )
+        option_button.grid(
+            row=option_index // 4,
+            column=option_index % 4,
+            sticky="ew",
+            padx=(6 if option_index % 4 == 0 else 3, 6 if option_index % 4 == 3 else 3),
+            pady=(7 if option_index < 4 else 3, 7 if option_index >= 4 else 3),
+        )
+        format_choices[option_key] = option_button
 
     hint_var = tk.StringVar(value=format_hint("original"))
     hint_card = ctk.CTkFrame(settings_card, fg_color=ACCENT_SOFT, corner_radius=12)
@@ -335,74 +346,125 @@ def main() -> int:
     ctk.CTkLabel(settings_card, text="保留内容", text_color=MUTED, font=small_font, anchor="w").grid(
         row=4, column=0, sticky="ew", padx=20, pady=(12, 0)
     )
-    content_row = ctk.CTkFrame(settings_card, fg_color="transparent")
-    content_row.grid(row=5, column=0, sticky="ew", padx=20, pady=(5, 0))
+    content_row = ctk.CTkFrame(
+        settings_card,
+        height=46,
+        fg_color=SURFACE,
+        corner_radius=12,
+        border_width=1,
+        border_color=BORDER,
+    )
+    content_row.grid(row=5, column=0, sticky="ew", padx=20, pady=(6, 0))
+    content_row.grid_propagate(False)
     content_row.grid_columnconfigure((0, 1, 2), weight=1)
     audio_selected = tk.BooleanVar(value=True)
     audio_checkbox = ctk.CTkCheckBox(
         content_row,
         text="音频",
         variable=audio_selected,
-        width=72,
-        height=22,
-        checkbox_width=18,
-        checkbox_height=18,
-        corner_radius=5,
+        width=78,
+        height=26,
+        checkbox_width=22,
+        checkbox_height=22,
+        corner_radius=6,
+        border_width=2,
         fg_color=ACCENT,
         border_color=ACCENT,
         text_color=TEXT,
         text_color_disabled=TEXT,
-        font=small_font,
+        font=body_font,
         state="disabled",
     )
-    audio_checkbox.grid(row=0, column=0, sticky="w")
+    audio_checkbox.grid(row=0, column=0, sticky="w", padx=(12, 4), pady=10)
     cover_var = tk.BooleanVar(value=False)
     cover_checkbox = ctk.CTkCheckBox(
         content_row,
         text="封面图片",
         variable=cover_var,
-        height=22,
-        checkbox_width=18,
-        checkbox_height=18,
-        corner_radius=5,
+        height=26,
+        checkbox_width=22,
+        checkbox_height=22,
+        corner_radius=6,
+        border_width=2,
         fg_color=ACCENT,
         hover_color=ACCENT_HOVER,
         border_color="#B6B9C8",
         text_color=TEXT,
-        font=small_font,
+        font=body_font,
     )
-    cover_checkbox.grid(row=0, column=1, sticky="w")
+    cover_checkbox.grid(row=0, column=1, sticky="w", padx=4, pady=10)
     metadata_var = tk.BooleanVar(value=False)
     metadata_checkbox = ctk.CTkCheckBox(
         content_row,
         text="元数据 JSON",
         variable=metadata_var,
-        height=22,
-        checkbox_width=18,
-        checkbox_height=18,
-        corner_radius=5,
+        height=26,
+        checkbox_width=22,
+        checkbox_height=22,
+        corner_radius=6,
+        border_width=2,
         fg_color=ACCENT,
         hover_color=ACCENT_HOVER,
         border_color="#B6B9C8",
         text_color=TEXT,
-        font=small_font,
+        font=body_font,
     )
-    metadata_checkbox.grid(row=0, column=2, sticky="w")
+    metadata_checkbox.grid(row=0, column=2, sticky="w", padx=(4, 12), pady=10)
 
     organize_var = tk.BooleanVar(value=False)
-    organize_switch = ctk.CTkSwitch(
+    organize_state_var = tk.StringVar(value="不可用")
+    organize_row = ctk.CTkFrame(
         settings_card,
-        text="每首歌曲单独建文件夹",
+        height=58,
+        fg_color=SURFACE,
+        corner_radius=12,
+        border_width=1,
+        border_color=BORDER,
+    )
+    organize_row.grid(row=6, column=0, sticky="ew", padx=20, pady=(8, 0))
+    organize_row.grid_propagate(False)
+    organize_row.grid_columnconfigure(0, weight=1)
+    ctk.CTkLabel(
+        organize_row,
+        text="按歌曲整理",
+        text_color=TEXT,
+        font=body_font,
+        anchor="w",
+    ).grid(row=0, column=0, sticky="sw", padx=(12, 4), pady=(7, 0))
+    organize_help = ctk.CTkLabel(
+        organize_row,
+        text="选择封面或元数据后，可为每首歌创建文件夹",
+        text_color=SUBTLE,
+        font=ctk.CTkFont(size=10),
+        anchor="w",
+    )
+    organize_help.grid(row=1, column=0, sticky="nw", padx=(12, 4), pady=(0, 7))
+    organize_state = ctk.CTkLabel(
+        organize_row,
+        textvariable=organize_state_var,
+        width=42,
+        text_color=SUBTLE,
+        font=small_font,
+    )
+    organize_state.grid(row=0, column=1, rowspan=2, padx=(4, 6))
+    organize_switch = ctk.CTkSwitch(
+        organize_row,
+        text="",
         variable=organize_var,
+        width=50,
+        height=30,
+        switch_width=48,
+        switch_height=26,
+        corner_radius=13,
+        border_width=2,
+        fg_color=SWITCH_OFF,
+        border_color=CONTROL_BORDER,
         progress_color=ACCENT,
         button_color="#FFFFFF",
-        button_hover_color="#FFFFFF",
-        text_color=TEXT,
-        text_color_disabled=SUBTLE,
-        font=small_font,
+        button_hover_color="#F7F7FB",
         state="disabled",
     )
-    organize_switch.grid(row=6, column=0, sticky="w", padx=20, pady=(8, 0))
+    organize_switch.grid(row=0, column=2, rowspan=2, padx=(0, 12))
 
     ctk.CTkLabel(settings_card, text="输出目录", text_color=MUTED, font=small_font, anchor="w").grid(
         row=7, column=0, sticky="ew", padx=20, pady=(12, 0)
@@ -440,17 +502,57 @@ def main() -> int:
     choose_output_button.grid(row=0, column=1)
 
     recursive = tk.BooleanVar(value=True)
-    recursive_switch = ctk.CTkSwitch(
+    recursive_state_var = tk.StringVar(value="开启")
+    recursive_row = ctk.CTkFrame(
         settings_card,
-        text="搜索文件夹中的子目录",
-        variable=recursive,
-        progress_color=ACCENT,
-        button_color="#FFFFFF",
-        button_hover_color="#FFFFFF",
+        height=58,
+        fg_color=SURFACE,
+        corner_radius=12,
+        border_width=1,
+        border_color=BORDER,
+    )
+    recursive_row.grid(row=9, column=0, sticky="ew", padx=20, pady=(8, 0))
+    recursive_row.grid_propagate(False)
+    recursive_row.grid_columnconfigure(0, weight=1)
+    ctk.CTkLabel(
+        recursive_row,
+        text="扫描子目录",
         text_color=TEXT,
+        font=body_font,
+        anchor="w",
+    ).grid(row=0, column=0, sticky="sw", padx=(12, 4), pady=(7, 0))
+    ctk.CTkLabel(
+        recursive_row,
+        text="添加文件夹时包含所有下级文件夹",
+        text_color=SUBTLE,
+        font=ctk.CTkFont(size=10),
+        anchor="w",
+    ).grid(row=1, column=0, sticky="nw", padx=(12, 4), pady=(0, 7))
+    recursive_state = ctk.CTkLabel(
+        recursive_row,
+        textvariable=recursive_state_var,
+        width=42,
+        text_color=ACCENT,
         font=small_font,
     )
-    recursive_switch.grid(row=9, column=0, sticky="w", padx=20, pady=(8, 0))
+    recursive_state.grid(row=0, column=1, rowspan=2, padx=(4, 6))
+    recursive_switch = ctk.CTkSwitch(
+        recursive_row,
+        text="",
+        variable=recursive,
+        width=50,
+        height=30,
+        switch_width=48,
+        switch_height=26,
+        corner_radius=13,
+        border_width=2,
+        fg_color=SWITCH_OFF,
+        border_color=CONTROL_BORDER,
+        progress_color=ACCENT,
+        button_color="#FFFFFF",
+        button_hover_color="#F7F7FB",
+    )
+    recursive_switch.grid(row=0, column=2, rowspan=2, padx=(0, 12))
 
     safety_card = ctk.CTkFrame(settings_card, fg_color=SUCCESS_SOFT, corner_radius=12)
     safety_card.grid(row=11, column=0, sticky="ew", padx=20, pady=(8, 0))
@@ -473,39 +575,6 @@ def main() -> int:
         state="disabled",
     )
     start_button.grid(row=12, column=0, sticky="ew", padx=20, pady=(9, 16))
-
-    format_panel = ctk.CTkFrame(
-        settings_card,
-        width=330,
-        height=178,
-        fg_color=CARD,
-        corner_radius=14,
-        border_width=1,
-        border_color="#D6D3FF",
-    )
-    format_panel.grid_columnconfigure((0, 1), weight=1)
-    format_choices: dict[str, object] = {}
-    for option_index, (option_key, option) in enumerate(FORMATS.items()):
-        option_button = ctk.CTkButton(
-            format_panel,
-            text=option["label"],
-            height=34,
-            corner_radius=10,
-            fg_color=ACCENT_SOFT if option_key == "original" else "transparent",
-            hover_color=ACCENT_SOFT,
-            text_color=ACCENT if option_key == "original" else TEXT,
-            font=small_font,
-            anchor="w",
-            command=lambda key=option_key: choose_format(key),
-        )
-        option_button.grid(
-            row=option_index // 2,
-            column=option_index % 2,
-            sticky="ew",
-            padx=(8 if option_index % 2 == 0 else 4, 4 if option_index % 2 == 0 else 8),
-            pady=(8 if option_index < 2 else 3, 8 if option_index >= len(FORMATS) - 2 else 3),
-        )
-        format_choices[option_key] = option_button
 
     result_card = ctk.CTkFrame(
         root,
@@ -681,24 +750,16 @@ def main() -> int:
             output_var.set(selected)
 
     def choose_format(target: str) -> None:
-        format_var.set(FORMATS[target]["label"])
+        target_var.set(target)
         hint_var.set(format_hint(target))
         for key, button in format_choices.items():
             selected = key == target
             button.configure(
-                fg_color=ACCENT_SOFT if selected else "transparent",
-                text_color=ACCENT if selected else TEXT,
+                fg_color=ACCENT if selected else "transparent",
+                hover_color=ACCENT_HOVER if selected else ACCENT_SOFT,
+                text_color="#FFFFFF" if selected else TEXT,
+                border_color=ACCENT if selected else SURFACE,
             )
-        format_panel.place_forget()
-
-    def toggle_format_panel() -> None:
-        if busy:
-            return
-        if format_panel.winfo_manager() == "place":
-            format_panel.place_forget()
-        else:
-            format_panel.place(relx=0.5, y=94, anchor="n")
-            format_panel.lift()
 
     def on_drop_enter(_: object) -> str:
         if not busy:
@@ -733,11 +794,21 @@ def main() -> int:
 
     def update_extra_controls() -> None:
         has_extras = cover_var.get() or metadata_var.get()
-        organize_switch.configure(state="normal" if has_extras and not busy else "disabled")
+        enabled = has_extras and not busy
+        if not has_extras:
+            organize_var.set(False)
+        organize_switch.configure(state="normal" if enabled else "disabled")
+        organize_state_var.set("开启" if organize_var.get() else ("关闭" if has_extras else "不可用"))
+        organize_state.configure(text_color=ACCENT if organize_var.get() else SUBTLE)
+        organize_help.configure(
+            text="每首歌的音频与附加文件放在同一文件夹" if has_extras else "选择封面或元数据后，可为每首歌创建文件夹"
+        )
+
+    def update_recursive_state() -> None:
+        recursive_state_var.set("开启" if recursive.get() else "关闭")
+        recursive_state.configure(text_color=ACCENT if recursive.get() else MUTED)
 
     def set_controls_enabled(enabled: bool) -> None:
-        if not enabled:
-            format_panel.place_forget()
         state = "normal" if enabled else "disabled"
         for widget in interactive_widgets:
             widget.configure(state=state)
@@ -831,7 +902,7 @@ def main() -> int:
             args=(
                 sources,
                 Path(output_var.get()).expanduser() if output_var.get().strip() else None,
-                target_from_label(format_var.get()),
+                target_var.get(),
                 failures,
                 metadata_var.get(),
                 cover_var.get(),
@@ -878,8 +949,8 @@ def main() -> int:
     choose_output_button.configure(command=choose_output)
     cover_checkbox.configure(command=update_extra_controls)
     metadata_checkbox.configure(command=update_extra_controls)
-    format_display.configure(command=toggle_format_panel)
-    format_arrow.configure(command=toggle_format_panel)
+    organize_switch.configure(command=update_extra_controls)
+    recursive_switch.configure(command=update_recursive_state)
     start_button.configure(command=start)
     interactive_widgets.extend(
         [
@@ -888,15 +959,15 @@ def main() -> int:
             add_folder_button,
             choose_output_button,
             output_entry,
-            format_display,
-            format_arrow,
             cover_checkbox,
             metadata_checkbox,
             recursive_switch,
+            *format_choices.values(),
         ]
     )
 
     update_extra_controls()
+    update_recursive_state()
     initial_paths = [Path(argument) for argument in sys.argv[1:] if argument != "--"]
     if initial_paths:
         add_paths(initial_paths)
