@@ -282,22 +282,40 @@ def main() -> int:
         row=1, column=0, sticky="ew", padx=20
     )
     format_var = tk.StringVar(value=FORMATS["original"]["label"])
-    format_menu = ctk.CTkOptionMenu(
+    format_selector = ctk.CTkFrame(
         settings_card,
-        variable=format_var,
-        values=[item["label"] for item in FORMATS.values()],
         height=40,
         corner_radius=12,
         fg_color=SURFACE,
-        button_color="#E7E8F0",
-        button_hover_color="#DADCE8",
-        text_color=TEXT,
-        dropdown_fg_color=CARD,
-        dropdown_hover_color=ACCENT_SOFT,
-        dropdown_text_color=TEXT,
-        font=body_font,
+        border_width=1,
+        border_color=BORDER,
     )
-    format_menu.grid(row=2, column=0, sticky="ew", padx=20, pady=(6, 10))
+    format_selector.grid(row=2, column=0, sticky="ew", padx=20, pady=(6, 10))
+    format_selector.grid_columnconfigure(0, weight=1)
+    format_display = ctk.CTkButton(
+        format_selector,
+        textvariable=format_var,
+        height=38,
+        corner_radius=11,
+        fg_color="transparent",
+        hover_color="#EEF0F6",
+        text_color=TEXT,
+        font=body_font,
+        anchor="w",
+    )
+    format_display.grid(row=0, column=0, sticky="ew")
+    format_arrow = ctk.CTkButton(
+        format_selector,
+        text="⌄",
+        width=42,
+        height=38,
+        corner_radius=11,
+        fg_color="transparent",
+        hover_color="#E7E8F0",
+        text_color=TEXT,
+        font=ctk.CTkFont(size=18, weight="bold"),
+    )
+    format_arrow.grid(row=0, column=1, sticky="e")
 
     hint_var = tk.StringVar(value=format_hint("original"))
     hint_card = ctk.CTkFrame(settings_card, fg_color=ACCENT_SOFT, corner_radius=12)
@@ -383,6 +401,39 @@ def main() -> int:
         state="disabled",
     )
     start_button.grid(row=9, column=0, sticky="ew", padx=20, pady=(18, 20))
+
+    format_panel = ctk.CTkFrame(
+        settings_card,
+        width=330,
+        height=178,
+        fg_color=CARD,
+        corner_radius=14,
+        border_width=1,
+        border_color="#D6D3FF",
+    )
+    format_panel.grid_columnconfigure((0, 1), weight=1)
+    format_choices: dict[str, object] = {}
+    for option_index, (option_key, option) in enumerate(FORMATS.items()):
+        option_button = ctk.CTkButton(
+            format_panel,
+            text=option["label"],
+            height=34,
+            corner_radius=10,
+            fg_color=ACCENT_SOFT if option_key == "original" else "transparent",
+            hover_color=ACCENT_SOFT,
+            text_color=ACCENT if option_key == "original" else TEXT,
+            font=small_font,
+            anchor="w",
+            command=lambda key=option_key: choose_format(key),
+        )
+        option_button.grid(
+            row=option_index // 2,
+            column=option_index % 2,
+            sticky="ew",
+            padx=(8 if option_index % 2 == 0 else 4, 4 if option_index % 2 == 0 else 8),
+            pady=(8 if option_index < 2 else 3, 8 if option_index >= len(FORMATS) - 2 else 3),
+        )
+        format_choices[option_key] = option_button
 
     result_card = ctk.CTkFrame(
         root,
@@ -557,8 +608,25 @@ def main() -> int:
         if selected:
             output_var.set(selected)
 
-    def on_format_changed(label: str) -> None:
-        hint_var.set(format_hint(target_from_label(label)))
+    def choose_format(target: str) -> None:
+        format_var.set(FORMATS[target]["label"])
+        hint_var.set(format_hint(target))
+        for key, button in format_choices.items():
+            selected = key == target
+            button.configure(
+                fg_color=ACCENT_SOFT if selected else "transparent",
+                text_color=ACCENT if selected else TEXT,
+            )
+        format_panel.place_forget()
+
+    def toggle_format_panel() -> None:
+        if busy:
+            return
+        if format_panel.winfo_manager() == "place":
+            format_panel.place_forget()
+        else:
+            format_panel.place(relx=0.5, y=94, anchor="n")
+            format_panel.lift()
 
     def on_drop_enter(_: object) -> str:
         if not busy:
@@ -592,6 +660,8 @@ def main() -> int:
             bind_click_tree(child)
 
     def set_controls_enabled(enabled: bool) -> None:
+        if not enabled:
+            format_panel.place_forget()
         state = "normal" if enabled else "disabled"
         for widget in interactive_widgets:
             widget.configure(state=state)
@@ -708,10 +778,20 @@ def main() -> int:
     add_file_button.configure(command=add_files)
     add_folder_button.configure(command=add_folder)
     choose_output_button.configure(command=choose_output)
-    format_menu.configure(command=on_format_changed)
+    format_display.configure(command=toggle_format_panel)
+    format_arrow.configure(command=toggle_format_panel)
     start_button.configure(command=start)
     interactive_widgets.extend(
-        [clear_button, add_file_button, add_folder_button, choose_output_button, output_entry, format_menu, recursive_switch]
+        [
+            clear_button,
+            add_file_button,
+            add_folder_button,
+            choose_output_button,
+            output_entry,
+            format_display,
+            format_arrow,
+            recursive_switch,
+        ]
     )
 
     initial_paths = [Path(argument) for argument in sys.argv[1:] if argument != "--"]
