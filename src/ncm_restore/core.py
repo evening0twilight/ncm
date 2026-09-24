@@ -181,7 +181,13 @@ def _unique_path(directory: Path, stem: str, suffix: str, metadata: dict[str, An
         number += 1
 
 
-def restore(source: Path, output_dir: Path) -> dict[str, Any]:
+def restore(
+    source: Path,
+    output_dir: Path,
+    *,
+    export_metadata: bool = True,
+    export_cover: bool = True,
+) -> dict[str, Any]:
     """Restore audio and optional sidecars; never alter the source or overwrite output."""
     source = Path(source)
     output_dir = Path(output_dir)
@@ -216,7 +222,9 @@ def restore(source: Path, output_dir: Path) -> dict[str, Any]:
         if _sha256(temporary) != digest.hexdigest():
             raise NcmError("输出文件回读 SHA-256 校验失败")
         validation = _verify_audio(temporary)
-        candidate = _unique_path(output_dir, source.stem, f".{kind}", header.metadata, header.cover)
+        collision_metadata = header.metadata if export_metadata else None
+        collision_cover = header.cover if export_cover else b""
+        candidate = _unique_path(output_dir, source.stem, f".{kind}", collision_metadata, collision_cover)
         # Hard-link publication is atomic and fails if another process claimed the name.
         while True:
             try:
@@ -224,13 +232,21 @@ def restore(source: Path, output_dir: Path) -> dict[str, Any]:
                 published.append(candidate)
                 break
             except FileExistsError:
-                candidate = _unique_path(output_dir, source.stem, f".{kind}", header.metadata, header.cover)
+                candidate = _unique_path(output_dir, source.stem, f".{kind}", collision_metadata, collision_cover)
         sidecars: list[str] = []
-        for suffix, data in (
-            (".ncm-metadata.json", json.dumps(header.metadata, ensure_ascii=False, indent=2).encode("utf-8") if header.metadata is not None else None),
-            (".cover.jpg" if header.cover.startswith(b"\xff\xd8") else ".cover.png" if header.cover.startswith(b"\x89PNG") else ".cover.bin", header.cover or None),
+        for suffix, data, enabled in (
+            (
+                ".ncm-metadata.json",
+                json.dumps(header.metadata, ensure_ascii=False, indent=2).encode("utf-8") if header.metadata is not None else None,
+                export_metadata,
+            ),
+            (
+                ".cover.jpg" if header.cover.startswith(b"\xff\xd8") else ".cover.png" if header.cover.startswith(b"\x89PNG") else ".cover.bin",
+                header.cover or None,
+                export_cover,
+            ),
         ):
-            if data is None:
+            if data is None or not enabled:
                 continue
             path = candidate.with_suffix(suffix)
             try:

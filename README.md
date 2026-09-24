@@ -35,6 +35,7 @@ NCM Restore Local 是一个开源的网易云音乐 `.ncm` 音频恢复与格式
 - 原样恢复 NCM 内部的 FLAC/MP3，不重新编码。
 - 转换为 WAV、FLAC、ALAC/M4A、MP3、AAC/M4A 或 Opus。
 - 现代桌面 GUI：圆角卡片布局、拖入或选择文件/文件夹、格式选择、进度与逐项结果。
+- 默认只生成音频；可多选导出封面图片和元数据 JSON，并决定是否按歌曲建立文件夹。
 - 命令行批量转换，支持中文、日文、韩文及其他 Unicode 路径。
 - 尽量写入标题、艺术家、专辑和封面，同时保留完整元数据与封面侧车。
 - SHA-256 回读校验、FFmpeg 整首解码检查，以及无损转换的 PCM 一致性检查。
@@ -94,7 +95,9 @@ Windows 使用：
 1. 把 NCM 文件或文件夹拖入蓝色区域，也可以点击该区域选择文件。
 2. 选择输出目录；留空时会在源文件旁创建 `recovered` 文件夹。
 3. 选择“原样恢复”或需要的目标格式。
-4. 点击“开始转换”，在结果列表查看输出路径或失败原因。
+4. “保留内容”默认只选音频；需要时再勾选封面图片或元数据 JSON。
+5. 导出附加文件时，可选择“每首歌曲单独建文件夹”。
+6. 点击“开始转换”，在结果列表查看输出路径或失败原因。
 
 命令行示例：
 
@@ -108,6 +111,9 @@ Windows 使用：
 # 批量转换为 MP3，并保存 JSON 报告
 .venv/bin/ncm-restore -r '/path/NCM音乐' --to mp3 -o '/path/MP3' --report '/path/report.json'
 
+# 同时导出封面和元数据，并按歌曲建立文件夹
+.venv/bin/ncm-restore -r '/path/NCM音乐' --cover --metadata --separate-folders -o '/path/归档'
+
 # 查看完整参数
 .venv/bin/ncm-restore --help
 ```
@@ -116,19 +122,19 @@ Windows 使用：
 
 | `--to` | 输出 | 质量与默认设置 | 封面 |
 |---|---|---|---|
-| `original` | 内部 FLAC 或 MP3 | 原始字节不变；默认且推荐 | 侧车 |
-| `wav` | WAV / PCM | 无损；保留采样率、声道和已知位深 | 侧车 |
-| `flac` | FLAC | 无损；保留采样率、声道和已知位深 | 尝试嵌入并保留侧车 |
-| `alac` | ALAC / M4A | 无损；保留采样率、声道和已知位深 | 尝试嵌入并保留侧车 |
-| `mp3` | MP3 | 有损；320 kb/s，最高 48 kHz | 尝试嵌入并保留侧车 |
-| `aac` | AAC / M4A | 有损；256 kb/s，最高 96 kHz | 尝试嵌入并保留侧车 |
-| `opus` | Opus | 有损；192 kb/s VBR，48 kHz | 侧车 |
+| `original` | 内部 FLAC 或 MP3 | 原始字节不变；默认且推荐 | 可选单独导出 |
+| `wav` | WAV / PCM | 无损；保留采样率、声道和已知位深 | 可选单独导出 |
+| `flac` | FLAC | 无损；保留采样率、声道和已知位深 | 尝试嵌入；可选单独导出 |
+| `alac` | ALAC / M4A | 无损；保留采样率、声道和已知位深 | 尝试嵌入；可选单独导出 |
+| `mp3` | MP3 | 有损；320 kb/s，最高 48 kHz | 尝试嵌入；可选单独导出 |
+| `aac` | AAC / M4A | 有损；256 kb/s，最高 96 kHz | 尝试嵌入；可选单独导出 |
+| `opus` | Opus | 有损；192 kb/s VBR，48 kHz | 可选单独导出 |
 
 转换结果会报告实际 codec、采样率、声道、位深、SHA-256、标签和封面状态。已有输出会自动编号，例如 `歌曲 (2).flac`。
 
 ### 验证范围
 
-当前版本通过 11 项自动测试。四份真实 NCM 样例已在 macOS 上原样恢复为 FLAC，源文件哈希保持不变，恢复结果通过 FFmpeg 整首解码；WAV、FLAC 和 ALAC 的无损转换通过 PCM 哈希一致性检查。详细证据见 [VALIDATION.md](VALIDATION.md)。
+当前版本通过 12 项自动测试。四份真实 NCM 样例已在 macOS 上原样恢复为 FLAC，源文件哈希保持不变，恢复结果通过 FFmpeg 整首解码；WAV、FLAC 和 ALAC 的无损转换通过 PCM 哈希一致性检查。详细证据见 [VALIDATION.md](VALIDATION.md)。
 
 桌面界面可以启动，核心选择与批量逻辑有自动测试；尚未完成自动化鼠标交互验收。Windows、Linux 和具体播放设备也尚未做实机兼容性保证。
 
@@ -149,6 +155,7 @@ Use the desktop GUI for everyday conversion or the CLI for recursive folders, au
 - Restore the original embedded FLAC/MP3 audio without re-encoding.
 - Convert NCM to WAV, FLAC, ALAC/M4A, MP3, AAC/M4A, or Opus.
 - Modern desktop GUI with rounded cards, drag-and-drop, format selection, progress, and per-file results.
+- Audio-only output by default, with optional artwork/metadata sidecars and per-song folders.
 - Batch CLI with Unicode paths and machine-readable JSON reports.
 - Preserve or embed title, artist, album, and artwork where supported; sidecars retain the complete NCM metadata.
 - Verify output with SHA-256 rereads and full FFmpeg decoding; compare decoded PCM for lossless conversions.
@@ -203,7 +210,7 @@ On Windows:
 .venv\Scripts\ncm-restore-gui.exe
 ```
 
-In the GUI, drag files or folders onto the blue drop zone, choose an output directory and target format, then click **Start conversion**. Leave the output field empty to create a `recovered` folder beside each source file.
+In the GUI, drag files or folders onto the blue drop zone, choose an output directory and target format, then click **Start conversion**. Audio is the only separate file by default. Select artwork and/or metadata when needed, and optionally place each song's files in its own folder. Leave the output field empty to create a `recovered` folder beside each source file.
 
 CLI examples:
 
@@ -217,6 +224,9 @@ CLI examples:
 # Batch convert NCM to MP3 and write a JSON report
 .venv/bin/ncm-restore -r '/path/NCM Music' --to mp3 -o '/path/MP3' --report '/path/report.json'
 
+# Export artwork and metadata into a separate folder for each song
+.venv/bin/ncm-restore -r '/path/NCM Music' --cover --metadata --separate-folders -o '/path/Archive'
+
 # Show every option
 .venv/bin/ncm-restore --help
 ```
@@ -225,19 +235,19 @@ CLI examples:
 
 | `--to` | Output | Quality and defaults | Artwork |
 |---|---|---|---|
-| `original` | Embedded FLAC or MP3 | Exact audio bytes; default and recommended | Sidecar |
-| `wav` | WAV / PCM | Lossless; preserves rate, channels, and known bit depth | Sidecar |
-| `flac` | FLAC | Lossless; preserves rate, channels, and known bit depth | Embedded when possible + sidecar |
-| `alac` | ALAC / M4A | Lossless; preserves rate, channels, and known bit depth | Embedded when possible + sidecar |
-| `mp3` | MP3 | Lossy; 320 kb/s, up to 48 kHz | Embedded when possible + sidecar |
-| `aac` | AAC / M4A | Lossy; 256 kb/s, up to 96 kHz | Embedded when possible + sidecar |
-| `opus` | Opus | Lossy; 192 kb/s VBR, 48 kHz | Sidecar |
+| `original` | Embedded FLAC or MP3 | Exact audio bytes; default and recommended | Optional separate file |
+| `wav` | WAV / PCM | Lossless; preserves rate, channels, and known bit depth | Optional separate file |
+| `flac` | FLAC | Lossless; preserves rate, channels, and known bit depth | Embedded when possible; optional separate file |
+| `alac` | ALAC / M4A | Lossless; preserves rate, channels, and known bit depth | Embedded when possible; optional separate file |
+| `mp3` | MP3 | Lossy; 320 kb/s, up to 48 kHz | Embedded when possible; optional separate file |
+| `aac` | AAC / M4A | Lossy; 256 kb/s, up to 96 kHz | Embedded when possible; optional separate file |
+| `opus` | Opus | Lossy; 192 kb/s VBR, 48 kHz | Optional separate file |
 
 Each result reports its actual codec, sample rate, channel count, bit depth, SHA-256, metadata, and artwork status. Existing filenames are never overwritten; a suffix such as `song (2).flac` is used instead.
 
 ### Validation status
 
-The current release passes 11 automated tests. Four real NCM samples were restored to FLAC on macOS without changing the source hashes, and every restored file passed a full FFmpeg decode. WAV, FLAC, and ALAC lossless conversions matched decoded PCM hashes. See [VALIDATION.md](VALIDATION.md).
+The current release passes 12 automated tests. Four real NCM samples were restored to FLAC on macOS without changing the source hashes, and every restored file passed a full FFmpeg decode. WAV, FLAC, and ALAC lossless conversions matched decoded PCM hashes. See [VALIDATION.md](VALIDATION.md).
 
 The GUI starts successfully and its selection/batch logic is tested, but automated mouse interaction has not been completed. Windows, Linux, and individual playback devices have not received hardware compatibility certification.
 
@@ -258,6 +268,7 @@ NCM Restore Local は、ローカルに保存された NetEase Cloud Music の `
 - 内部の FLAC/MP3 を再エンコードせずに復元。
 - NCM を WAV、FLAC、ALAC/M4A、MP3、AAC/M4A、Opus に変換。
 - 角丸カードを採用したモダン GUI。ドラッグ＆ドロップ、形式選択、進行状況、個別結果に対応。
+- 既定では音声ファイルのみを出力。画像と JSON を個別に選択し、曲ごとのフォルダー整理も可能。
 - Unicode パスと JSON レポートに対応した一括 CLI。
 - 対応形式ではタイトル、アーティスト、アルバム、アートワークを埋め込み、完全な情報はサイドカーファイルにも保存。
 - SHA-256 の再読み込み、FFmpeg の全曲デコード、可逆変換時の PCM 一致確認。
@@ -296,7 +307,7 @@ GUI を起動：
 .venv/bin/ncm-restore-gui
 ```
 
-GUI の青い領域へファイルまたはフォルダーをドラッグし、出力先と変換形式を選択して「変換開始」を押します。出力先を空欄にすると、元ファイルと同じ場所に `recovered` フォルダーを作成します。
+GUI の青い領域へファイルまたはフォルダーをドラッグし、出力先と変換形式を選択して「変換開始」を押します。既定では音声のみを出力し、必要に応じて画像と JSON、曲ごとのフォルダー整理を選択できます。出力先を空欄にすると、元ファイルと同じ場所に `recovered` フォルダーを作成します。
 
 コマンドライン例：
 
@@ -323,7 +334,7 @@ GUI の青い領域へファイルまたはフォルダーをドラッグし、�
 | `aac` | AAC / M4A | 非可逆。256 kb/s、最大 96 kHz |
 | `opus` | Opus | 非可逆。192 kb/s VBR、48 kHz |
 
-現在のリリースは 11 件の自動テストに合格しています。macOS 上で 4 件の実 NCM を FLAC に復元し、元ファイルのハッシュ不変と FFmpeg の全曲デコードを確認しました。WAV、FLAC、ALAC はデコード後の PCM ハッシュも一致しています。詳細は [VALIDATION.md](VALIDATION.md) を参照してください。
+現在のリリースは 12 件の自動テストに合格しています。macOS 上で 4 件の実 NCM を FLAC に復元し、元ファイルのハッシュ不変と FFmpeg の全曲デコードを確認しました。WAV、FLAC、ALAC はデコード後の PCM ハッシュも一致しています。詳細は [VALIDATION.md](VALIDATION.md) を参照してください。
 
 GUI の起動と主要ロジックは確認済みですが、マウス操作の自動検証、Windows/Linux 実機、個別再生機器の互換性保証はまだありません。
 
@@ -344,6 +355,7 @@ NCM Restore Local은 로컬에 저장된 NetEase Cloud Music `.ncm` 파일을 �
 - 내부 FLAC/MP3를 재인코딩 없이 복원.
 - NCM을 WAV, FLAC, ALAC/M4A, MP3, AAC/M4A, Opus로 변환.
 - 둥근 카드 레이아웃, 드래그 앤 드롭, 형식 선택, 진행률, 파일별 결과를 제공하는 현대적인 GUI.
+- 기본적으로 오디오 파일만 출력하며 표지 이미지, 메타데이터 JSON, 곡별 폴더 구성을 선택할 수 있음.
 - Unicode 경로와 JSON 보고서를 지원하는 일괄 CLI.
 - 가능한 형식에 제목, 아티스트, 앨범, 표지를 삽입하고 전체 정보는 사이드카 파일에도 보존.
 - SHA-256 재검증, FFmpeg 전체 디코딩, 무손실 변환의 PCM 일치 검사.
@@ -382,7 +394,7 @@ GUI 실행：
 .venv/bin/ncm-restore-gui
 ```
 
-GUI의 파란 영역에 파일 또는 폴더를 끌어 놓고 출력 폴더와 대상 형식을 선택한 후 “변환 시작”을 누릅니다. 출력 폴더를 비워 두면 각 원본 옆에 `recovered` 폴더가 생성됩니다.
+GUI의 파란 영역에 파일 또는 폴더를 끌어 놓고 출력 폴더와 대상 형식을 선택한 후 “변환 시작”을 누릅니다. 기본값은 오디오만 출력하며 필요할 때 표지 이미지, JSON, 곡별 폴더 구성을 선택할 수 있습니다. 출력 폴더를 비워 두면 각 원본 옆에 `recovered` 폴더가 생성됩니다.
 
 명령줄 예시：
 
@@ -409,7 +421,7 @@ GUI의 파란 영역에 파일 또는 폴더를 끌어 놓고 출력 폴더와 �
 | `aac` | AAC / M4A | 손실 압축. 256 kb/s, 최대 96 kHz |
 | `opus` | Opus | 손실 압축. 192 kb/s VBR, 48 kHz |
 
-현재 릴리스는 자동 테스트 11개를 통과했습니다. macOS에서 실제 NCM 파일 4개를 FLAC으로 복원했으며 원본 해시가 변하지 않았고 모든 결과가 FFmpeg 전체 디코딩을 통과했습니다. WAV, FLAC, ALAC 무손실 변환은 디코딩된 PCM 해시도 일치했습니다. 자세한 내용은 [VALIDATION.md](VALIDATION.md)를 확인하세요.
+현재 릴리스는 자동 테스트 12개를 통과했습니다. macOS에서 실제 NCM 파일 4개를 FLAC으로 복원했으며 원본 해시가 변하지 않았고 모든 결과가 FFmpeg 전체 디코딩을 통과했습니다. WAV, FLAC, ALAC 무손실 변환은 디코딩된 PCM 해시도 일치했습니다. 자세한 내용은 [VALIDATION.md](VALIDATION.md)를 확인하세요.
 
 GUI 실행과 주요 로직은 검증했지만 자동 마우스 조작, Windows/Linux 실기기, 개별 재생 장치 호환성은 아직 보증하지 않습니다.
 

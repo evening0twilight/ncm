@@ -41,6 +41,10 @@ def run_batch(
     sources: list[Path], output_dir: Path | None, target: str,
     on_result: Callable[[int, int, dict, bool], None] | None = None,
     on_start: Callable[[int, int, Path], None] | None = None,
+    *,
+    export_metadata: bool = True,
+    export_cover: bool = True,
+    organize: bool = False,
 ) -> tuple[list[dict], list[dict]]:
     successes: list[dict] = []
     failures: list[dict] = []
@@ -48,7 +52,14 @@ def run_batch(
         if on_start:
             on_start(index, len(sources), source)
         try:
-            result = convert(source, output_dir or source.parent / "recovered", target)
+            result = convert(
+                source,
+                output_dir or source.parent / "recovered",
+                target,
+                export_metadata=export_metadata,
+                export_cover=export_cover,
+                organize=organize,
+            )
             successes.append(result)
             if on_result:
                 on_result(index, len(sources), result, True)

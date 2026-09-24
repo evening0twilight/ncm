@@ -20,6 +20,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-o", "--output-dir", type=Path, help="输出目录；默认是每个源文件旁的 recovered 目录")
     parser.add_argument("-r", "--recursive", action="store_true", help="递归搜索输入目录")
     parser.add_argument("--to", choices=FORMATS, default="original", help="目标格式；默认 original 原样恢复。无损：wav/flac/alac；有损：mp3/aac/opus")
+    parser.add_argument("--cover", action="store_true", help="额外导出独立封面图片；默认只输出音频")
+    parser.add_argument("--metadata", action="store_true", help="额外导出 NCM 元数据 JSON；默认只输出音频")
+    parser.add_argument("--separate-folders", action="store_true", help="导出附加文件时，为每首歌曲创建独立文件夹")
     parser.add_argument("--report", type=Path, help="将结果写入新的 JSON 报告文件；不覆盖已有文件")
     args = parser.parse_args(argv)
 
@@ -38,7 +41,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"✗ [{index}/{total}] {item['source']}: {item['error']}", file=sys.stderr)
 
-    successes, conversion_failures = run_batch(sources, args.output_dir, args.to, report_item)
+    successes, conversion_failures = run_batch(
+        sources,
+        args.output_dir,
+        args.to,
+        report_item,
+        export_metadata=args.metadata,
+        export_cover=args.cover,
+        organize=args.separate_folders,
+    )
     failures.extend(conversion_failures)
     report = {"successes": successes, "failures": failures}
     if args.report:

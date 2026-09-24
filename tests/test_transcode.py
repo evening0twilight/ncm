@@ -77,6 +77,52 @@ class TranscodeTests(unittest.TestCase):
                 convert(self.source, self.root / "missing", "mp3")
         self.assertFalse((self.root / "missing").exists())
 
+    def test_selective_sidecars_and_per_song_folders(self):
+        audio_only = self.root / "audio-only"
+        result = convert(
+            self.source,
+            audio_only,
+            "original",
+            export_metadata=False,
+            export_cover=False,
+            organize=True,
+        )
+        self.assertEqual(result["sidecars"], [])
+        self.assertFalse(result["organized"])
+        self.assertEqual([path.name for path in audio_only.iterdir()], ["中文样例.flac"])
+
+        cover_only = self.root / "cover-only"
+        result = convert(
+            self.source,
+            cover_only,
+            "original",
+            export_metadata=False,
+            export_cover=True,
+        )
+        self.assertEqual(len(result["sidecars"]), 1)
+        self.assertTrue(Path(result["sidecars"][0]).name.endswith(".cover.png"))
+        self.assertFalse((cover_only / "中文样例.ncm-metadata.json").exists())
+
+        duplicate_parent = self.root / "另一目录"
+        duplicate_parent.mkdir()
+        duplicate = duplicate_parent / self.source.name
+        duplicate.write_bytes(self.source.read_bytes())
+        organized = self.root / "organized"
+        successes, failures = run_batch(
+            [self.source, duplicate],
+            organized,
+            "original",
+            export_metadata=True,
+            export_cover=True,
+            organize=True,
+        )
+        self.assertEqual(failures, [])
+        self.assertEqual(len(successes), 2)
+        folders = sorted(path for path in organized.iterdir() if path.is_dir())
+        self.assertEqual([path.name for path in folders], ["中文样例", "中文样例 (2)"])
+        self.assertTrue(all(len(list(folder.iterdir())) == 3 for folder in folders))
+        self.assertTrue(all(result["organized"] for result in successes))
+
     def test_transcoded_collision_and_invalid_cover_fallback(self):
         first = convert(self.source, self.root / "out", "mp3")
         second = convert(self.source, self.root / "out", "mp3")

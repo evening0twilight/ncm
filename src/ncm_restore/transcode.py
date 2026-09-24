@@ -108,14 +108,61 @@ def _tags(meta: dict[str, Any] | None) -> dict[str, str]:
     return result
 
 
-def convert(source: Path, output_dir: Path, target: str = "original") -> dict[str, Any]:
+def _destination_directory(base: Path, source: Path, organize: bool) -> tuple[Path, bool]:
+    base.mkdir(parents=True, exist_ok=True)
+    if not organize:
+        return base, False
+    stem = source.stem or "音频"
+    number = 1
+    while True:
+        name = stem if number == 1 else f"{stem} ({number})"
+        candidate = base / name
+        try:
+            candidate.mkdir()
+            return candidate, True
+        except FileExistsError:
+            number += 1
+
+
+def convert(
+    source: Path,
+    output_dir: Path,
+    target: str = "original",
+    *,
+    export_metadata: bool = True,
+    export_cover: bool = True,
+    organize: bool = False,
+) -> dict[str, Any]:
     """Restore original bytes or encode a requested target without modifying source."""
     if target not in FORMATS:
         raise ValueError(f"未知目标格式：{target}")
+    source, output_dir = Path(source), Path(output_dir)
+    tools = _tools() if target != "original" else None
+    organize = bool(organize and (export_metadata or export_cover))
+    destination_dir, created_directory = _destination_directory(output_dir, source, organize)
     if target == "original":
-        result = restore(source, output_dir)
+        try:
+            result = restore(
+                source,
+                destination_dir,
+                export_metadata=export_metadata,
+                export_cover=export_cover,
+            )
+        except Exception:
+            if created_directory:
+                try:
+                    destination_dir.rmdir()
+                except OSError:
+                    pass
+            raise
+        notes = []
+        if result["sidecars"]:
+            notes.append("已按选择导出附加文件")
+        else:
+            notes.append("仅输出音频文件")
         result.update({"target": target, "quality": "原样恢复", "metadata_embedded": None,
-                       "cover_embedded": None, "notes": ["原始音频标签保持不变；NCM 外层信息为侧车"]})
+                       "cover_embedded": None, "notes": notes, "organized": organize,
+                       "output_directory": str(destination_dir)})
         ffprobe = shutil.which("ffprobe")
         if ffprobe:
             try:
@@ -126,13 +173,12 @@ def convert(source: Path, output_dir: Path, target: str = "original") -> dict[st
                 result["notes"].append(f"FFprobe 未能补充流参数：{exc}")
         return result
 
-    ffmpeg, ffprobe = _tools()
-    source, output_dir = Path(source), Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    assert tools is not None
+    ffmpeg, ffprobe = tools
     temporary: Path | None = None
     published: list[Path] = []
     try:
-        with tempfile.TemporaryDirectory(prefix=".ncm-work-", dir=output_dir) as work_name:
+        with tempfile.TemporaryDirectory(prefix=".ncm-work-", dir=destination_dir) as work_name:
             work = Path(work_name)
             recovered = restore(source, work)
             original = Path(recovered["output"])
@@ -146,7 +192,7 @@ def convert(source: Path, output_dir: Path, target: str = "original") -> dict[st
             cover = next((p for p in recovered["sidecars"] if ".cover." in p), None)
             cover_path = Path(cover) if cover else None
             can_embed_cover = target in ("flac", "alac", "mp3", "aac") and cover_path is not None and cover_path.suffix in (".jpg", ".png")
-            with tempfile.NamedTemporaryFile(prefix=".ncm-encode-", suffix=FORMATS[target]["ext"], dir=output_dir, delete=False) as temp:
+            with tempfile.NamedTemporaryFile(prefix=".ncm-encode-", suffix=FORMATS[target]["ext"], dir=destination_dir, delete=False) as temp:
                 temporary = Path(temp.name)
             temporary.unlink()  # FFmpeg creates this pathname; it must not inherit an empty file.
 
@@ -189,10 +235,19 @@ def convert(source: Path, output_dir: Path, target: str = "original") -> dict[st
             requested_tags = _tags(meta)
             missing_tags = [key for key, value in requested_tags.items() if tags.get(key) != value]
             cover_embedded = any(s.get("codec_type") == "video" and s.get("disposition", {}).get("attached_pic") == 1 for s in output_info["streams"])
-            sidecar_paths = [original.with_suffix(".ncm-metadata.json") if meta_path.exists() else None, cover_path]
+            sidecar_paths = [
+                original.with_suffix(".ncm-metadata.json") if export_metadata and meta_path.exists() else None,
+                cover_path if export_cover else None,
+            ]
             sidecar_paths = [p for p in sidecar_paths if p is not None]
             while True:
-                candidate = _unique_path(output_dir, source.stem, FORMATS[target]["ext"], meta, cover_path.read_bytes() if cover_path else b"")
+                candidate = _unique_path(
+                    destination_dir,
+                    source.stem,
+                    FORMATS[target]["ext"],
+                    meta if export_metadata else None,
+                    cover_path.read_bytes() if export_cover and cover_path else b"",
+                )
                 try:
                     os.link(temporary, candidate)
                     published.append(candidate)
@@ -211,10 +266,11 @@ def convert(source: Path, output_dir: Path, target: str = "original") -> dict[st
             notes = []
             if rate != source_rate:
                 notes.append(f"采样率从 {source_rate} Hz 转为 {rate} Hz（目标编码器限制）")
-            if cover_path and not cover_embedded:
+            if export_cover and cover_path and not cover_embedded:
                 notes.append("封面仅保存在侧车" + ("（嵌入尝试失败）" if cover_fallback else ""))
             if missing_tags:
-                notes.append("以下标签未在输出中核实，完整元数据见侧车：" + ", ".join(missing_tags))
+                suffix = "，完整元数据见侧车" if export_metadata else ""
+                notes.append("以下标签未在输出中核实" + suffix + "：" + ", ".join(missing_tags))
             if recovered["format"] == "mp3" and FORMATS[target]["lossless"]:
                 notes.append("源音频为有损 MP3，转成无损格式不能恢复已损失音质")
             return {
@@ -229,6 +285,7 @@ def convert(source: Path, output_dir: Path, target: str = "original") -> dict[st
                 "metadata_embedded": not missing_tags if requested_tags else None,
                 "cover_embedded": cover_embedded if cover_path else None,
                 "sidecars": output_sidecars, "notes": notes, "warning": recovered["warning"],
+                "organized": organize, "output_directory": str(destination_dir),
             }
     except Exception:
         for path in published:
@@ -237,3 +294,8 @@ def convert(source: Path, output_dir: Path, target: str = "original") -> dict[st
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+        if created_directory:
+            try:
+                destination_dir.rmdir()
+            except OSError:
+                pass

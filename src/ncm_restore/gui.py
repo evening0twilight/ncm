@@ -273,10 +273,10 @@ def main() -> int:
     settings_card = ctk.CTkFrame(workspace, fg_color=CARD, corner_radius=20, border_width=1, border_color=BORDER)
     settings_card.grid(row=0, column=1, sticky="nsew", padx=(9, 0))
     settings_card.grid_columnconfigure(0, weight=1)
-    settings_card.grid_rowconfigure(8, weight=1)
+    settings_card.grid_rowconfigure(10, weight=1)
 
     ctk.CTkLabel(settings_card, text="转换设置", text_color=TEXT, font=heading_font, anchor="w").grid(
-        row=0, column=0, sticky="ew", padx=20, pady=(18, 16)
+        row=0, column=0, sticky="ew", padx=20, pady=(14, 10)
     )
     ctk.CTkLabel(settings_card, text="目标格式", text_color=MUTED, font=small_font, anchor="w").grid(
         row=1, column=0, sticky="ew", padx=20
@@ -284,18 +284,18 @@ def main() -> int:
     format_var = tk.StringVar(value=FORMATS["original"]["label"])
     format_selector = ctk.CTkFrame(
         settings_card,
-        height=40,
+        height=38,
         corner_radius=12,
         fg_color=SURFACE,
         border_width=1,
         border_color=BORDER,
     )
-    format_selector.grid(row=2, column=0, sticky="ew", padx=20, pady=(6, 10))
+    format_selector.grid(row=2, column=0, sticky="ew", padx=20, pady=(5, 8))
     format_selector.grid_columnconfigure(0, weight=1)
     format_display = ctk.CTkButton(
         format_selector,
         textvariable=format_var,
-        height=38,
+        height=36,
         corner_radius=11,
         fg_color="transparent",
         hover_color="#EEF0F6",
@@ -308,7 +308,7 @@ def main() -> int:
         format_selector,
         text="⌄",
         width=42,
-        height=38,
+        height=36,
         corner_radius=11,
         fg_color="transparent",
         hover_color="#E7E8F0",
@@ -321,7 +321,7 @@ def main() -> int:
     hint_card = ctk.CTkFrame(settings_card, fg_color=ACCENT_SOFT, corner_radius=12)
     hint_card.grid(row=3, column=0, sticky="ew", padx=20)
     hint_card.grid_columnconfigure(1, weight=1)
-    ctk.CTkLabel(hint_card, text="✓", text_color=ACCENT, font=body_bold).grid(row=0, column=0, padx=(12, 8), pady=10)
+    ctk.CTkLabel(hint_card, text="✓", text_color=ACCENT, font=body_bold).grid(row=0, column=0, padx=(12, 8), pady=8)
     ctk.CTkLabel(
         hint_card,
         textvariable=hint_var,
@@ -330,19 +330,91 @@ def main() -> int:
         anchor="w",
         justify="left",
         wraplength=260,
-    ).grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=10)
+    ).grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=8)
+
+    ctk.CTkLabel(settings_card, text="保留内容", text_color=MUTED, font=small_font, anchor="w").grid(
+        row=4, column=0, sticky="ew", padx=20, pady=(12, 0)
+    )
+    content_row = ctk.CTkFrame(settings_card, fg_color="transparent")
+    content_row.grid(row=5, column=0, sticky="ew", padx=20, pady=(5, 0))
+    content_row.grid_columnconfigure((0, 1, 2), weight=1)
+    audio_selected = tk.BooleanVar(value=True)
+    audio_checkbox = ctk.CTkCheckBox(
+        content_row,
+        text="音频",
+        variable=audio_selected,
+        width=72,
+        height=22,
+        checkbox_width=18,
+        checkbox_height=18,
+        corner_radius=5,
+        fg_color=ACCENT,
+        border_color=ACCENT,
+        text_color=TEXT,
+        text_color_disabled=TEXT,
+        font=small_font,
+        state="disabled",
+    )
+    audio_checkbox.grid(row=0, column=0, sticky="w")
+    cover_var = tk.BooleanVar(value=False)
+    cover_checkbox = ctk.CTkCheckBox(
+        content_row,
+        text="封面图片",
+        variable=cover_var,
+        height=22,
+        checkbox_width=18,
+        checkbox_height=18,
+        corner_radius=5,
+        fg_color=ACCENT,
+        hover_color=ACCENT_HOVER,
+        border_color="#B6B9C8",
+        text_color=TEXT,
+        font=small_font,
+    )
+    cover_checkbox.grid(row=0, column=1, sticky="w")
+    metadata_var = tk.BooleanVar(value=False)
+    metadata_checkbox = ctk.CTkCheckBox(
+        content_row,
+        text="元数据 JSON",
+        variable=metadata_var,
+        height=22,
+        checkbox_width=18,
+        checkbox_height=18,
+        corner_radius=5,
+        fg_color=ACCENT,
+        hover_color=ACCENT_HOVER,
+        border_color="#B6B9C8",
+        text_color=TEXT,
+        font=small_font,
+    )
+    metadata_checkbox.grid(row=0, column=2, sticky="w")
+
+    organize_var = tk.BooleanVar(value=False)
+    organize_switch = ctk.CTkSwitch(
+        settings_card,
+        text="每首歌曲单独建文件夹",
+        variable=organize_var,
+        progress_color=ACCENT,
+        button_color="#FFFFFF",
+        button_hover_color="#FFFFFF",
+        text_color=TEXT,
+        text_color_disabled=SUBTLE,
+        font=small_font,
+        state="disabled",
+    )
+    organize_switch.grid(row=6, column=0, sticky="w", padx=20, pady=(8, 0))
 
     ctk.CTkLabel(settings_card, text="输出目录", text_color=MUTED, font=small_font, anchor="w").grid(
-        row=4, column=0, sticky="ew", padx=20, pady=(16, 0)
+        row=7, column=0, sticky="ew", padx=20, pady=(12, 0)
     )
     output_row = ctk.CTkFrame(settings_card, fg_color="transparent")
-    output_row.grid(row=5, column=0, sticky="ew", padx=20, pady=(6, 4))
+    output_row.grid(row=8, column=0, sticky="ew", padx=20, pady=(5, 2))
     output_row.grid_columnconfigure(0, weight=1)
     output_var = tk.StringVar()
     output_entry = ctk.CTkEntry(
         output_row,
         textvariable=output_var,
-        height=40,
+        height=36,
         corner_radius=12,
         fg_color=SURFACE,
         border_color=BORDER,
@@ -356,7 +428,7 @@ def main() -> int:
         output_row,
         text="选择",
         width=64,
-        height=40,
+        height=36,
         corner_radius=12,
         fg_color=SURFACE,
         hover_color="#EEF0F6",
@@ -378,21 +450,21 @@ def main() -> int:
         text_color=TEXT,
         font=small_font,
     )
-    recursive_switch.grid(row=6, column=0, sticky="w", padx=20, pady=(12, 0))
+    recursive_switch.grid(row=9, column=0, sticky="w", padx=20, pady=(8, 0))
 
     safety_card = ctk.CTkFrame(settings_card, fg_color=SUCCESS_SOFT, corner_radius=12)
-    safety_card.grid(row=7, column=0, sticky="ew", padx=20, pady=(16, 0))
+    safety_card.grid(row=11, column=0, sticky="ew", padx=20, pady=(8, 0))
     ctk.CTkLabel(
         safety_card,
         text="✓ 保留源文件    ✓ 不覆盖已有文件",
         text_color=SUCCESS,
         font=small_font,
-    ).pack(padx=12, pady=9)
+    ).pack(padx=12, pady=7)
 
     start_button = ctk.CTkButton(
         settings_card,
         text="添加文件后即可开始",
-        height=48,
+        height=44,
         corner_radius=14,
         fg_color="#C9C7E9",
         hover_color="#C9C7E9",
@@ -400,7 +472,7 @@ def main() -> int:
         font=body_bold,
         state="disabled",
     )
-    start_button.grid(row=9, column=0, sticky="ew", padx=20, pady=(18, 20))
+    start_button.grid(row=12, column=0, sticky="ew", padx=20, pady=(9, 16))
 
     format_panel = ctk.CTkFrame(
         settings_card,
@@ -437,19 +509,19 @@ def main() -> int:
 
     result_card = ctk.CTkFrame(
         root,
-        height=168,
+        height=126,
         fg_color=CARD,
         corner_radius=20,
         border_width=1,
         border_color=BORDER,
     )
-    result_card.grid(row=2, column=0, sticky="ew", padx=28, pady=(18, 24))
+    result_card.grid(row=2, column=0, sticky="ew", padx=28, pady=(14, 24))
     result_card.grid_propagate(False)
     result_card.grid_columnconfigure(0, weight=1)
     result_card.grid_rowconfigure(2, weight=1)
 
     result_header = ctk.CTkFrame(result_card, fg_color="transparent")
-    result_header.grid(row=0, column=0, sticky="ew", padx=20, pady=(14, 8))
+    result_header.grid(row=0, column=0, sticky="ew", padx=20, pady=(10, 6))
     result_header.grid_columnconfigure(1, weight=1)
     ctk.CTkLabel(result_header, text="转换进度", text_color=TEXT, font=body_bold).grid(row=0, column=0, sticky="w")
     status_var = tk.StringVar(value="等待添加文件")
@@ -467,13 +539,13 @@ def main() -> int:
 
     result_list = ctk.CTkScrollableFrame(
         result_card,
-        height=60,
+        height=36,
         fg_color=SURFACE,
         corner_radius=12,
         scrollbar_button_color="#D8DAE5",
         scrollbar_button_hover_color="#BFC3D2",
     )
-    result_list.grid(row=2, column=0, sticky="nsew", padx=20, pady=(10, 16))
+    result_list.grid(row=2, column=0, sticky="nsew", padx=20, pady=(7, 12))
     result_list.grid_columnconfigure(0, weight=1)
 
     def clear_frame(frame: object) -> None:
@@ -659,49 +731,63 @@ def main() -> int:
         for child in widget.winfo_children():
             bind_click_tree(child)
 
+    def update_extra_controls() -> None:
+        has_extras = cover_var.get() or metadata_var.get()
+        organize_switch.configure(state="normal" if has_extras and not busy else "disabled")
+
     def set_controls_enabled(enabled: bool) -> None:
         if not enabled:
             format_panel.place_forget()
         state = "normal" if enabled else "disabled"
         for widget in interactive_widgets:
             widget.configure(state=state)
+        update_extra_controls()
         update_start_button()
 
     def add_result(item: dict, ok: bool) -> None:
         row_index = len(result_list.winfo_children())
         row = ctk.CTkFrame(result_list, fg_color=CARD, corner_radius=10, border_width=1, border_color=BORDER)
         row.grid(row=row_index, column=0, sticky="ew", pady=(0, 6))
-        row.grid_columnconfigure(1, weight=1)
+        row.grid_columnconfigure(2, weight=1)
         status = ctk.CTkLabel(
             row,
             text="成功" if ok else "失败",
             width=48,
-            height=24,
-            corner_radius=12,
+            height=22,
+            corner_radius=11,
             fg_color=SUCCESS_SOFT if ok else DANGER_SOFT,
             text_color=SUCCESS if ok else DANGER,
             font=small_font,
         )
-        status.grid(row=0, column=0, rowspan=2, padx=10, pady=9)
+        status.grid(row=0, column=0, padx=(8, 10), pady=6)
         ctk.CTkLabel(
             row,
             text=Path(item["source"]).name,
             text_color=TEXT,
             font=small_font,
             anchor="w",
-        ).grid(row=0, column=1, sticky="sew", pady=(7, 0))
+            width=260,
+        ).grid(row=0, column=1, sticky="w")
         detail = item.get("output", "") if ok else item.get("error", "")
-        if ok and item.get("notes"):
-            detail += " · " + "；".join(item["notes"])
+        if ok:
+            detail = "→ " + Path(detail).name
         ctk.CTkLabel(
             row,
             text=detail,
             text_color=SUBTLE,
             font=ctk.CTkFont(size=10),
             anchor="w",
-        ).grid(row=1, column=1, sticky="new", padx=(0, 10), pady=(0, 7))
+        ).grid(row=0, column=2, sticky="ew", padx=(10, 8))
 
-    def worker(sources: list[Path], output: Path | None, target: str, initial_failures: list[dict]) -> None:
+    def worker(
+        sources: list[Path],
+        output: Path | None,
+        target: str,
+        initial_failures: list[dict],
+        export_metadata: bool,
+        export_cover: bool,
+        organize: bool,
+    ) -> None:
         try:
             for failure in initial_failures:
                 messages.put(("result", 0, len(sources), failure, False))
@@ -712,7 +798,16 @@ def main() -> int:
             def send_start(index: int, total: int, source: Path) -> None:
                 messages.put(("start", index, total, str(source)))
 
-            successes, failures = run_batch(sources, output, target, send, send_start)
+            successes, failures = run_batch(
+                sources,
+                output,
+                target,
+                send,
+                send_start,
+                export_metadata=export_metadata,
+                export_cover=export_cover,
+                organize=organize,
+            )
             messages.put(("done", len(successes), len(failures) + len(initial_failures)))
         except Exception as exc:
             messages.put(("fatal", str(exc)))
@@ -738,6 +833,9 @@ def main() -> int:
                 Path(output_var.get()).expanduser() if output_var.get().strip() else None,
                 target_from_label(format_var.get()),
                 failures,
+                metadata_var.get(),
+                cover_var.get(),
+                organize_var.get(),
             ),
             daemon=True,
         ).start()
@@ -778,6 +876,8 @@ def main() -> int:
     add_file_button.configure(command=add_files)
     add_folder_button.configure(command=add_folder)
     choose_output_button.configure(command=choose_output)
+    cover_checkbox.configure(command=update_extra_controls)
+    metadata_checkbox.configure(command=update_extra_controls)
     format_display.configure(command=toggle_format_panel)
     format_arrow.configure(command=toggle_format_panel)
     start_button.configure(command=start)
@@ -790,16 +890,18 @@ def main() -> int:
             output_entry,
             format_display,
             format_arrow,
+            cover_checkbox,
+            metadata_checkbox,
             recursive_switch,
         ]
     )
 
+    update_extra_controls()
     initial_paths = [Path(argument) for argument in sys.argv[1:] if argument != "--"]
     if initial_paths:
         add_paths(initial_paths)
     else:
         redraw_inputs()
-    empty_row(result_list, "完成的转换会显示在这里")
     root.update_idletasks()
     register_drop_tree(root)
     bind_click_tree(drop_card)
